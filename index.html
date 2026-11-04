@@ -1,1 +1,1863 @@
 
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aero WiFi 2030 | Gestion Mondiale du Spectre Wi-Fi Aviation Commerciale</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js & TopoJSON pour la cartographie mondiale vectorielle -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <!-- Font Awesome pour l'iconographie aéronautique -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Polices Google : Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        avionics: {
+                            950: '#040814',
+                            900: '#091124',
+                            800: '#111e3b',
+                            700: '#1d315c',
+                            accent: '#00f0ff',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #040814;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        /* Grille radar subtile en arrière-plan */
+        .bg-radar-grid {
+            background-size: 32px 32px;
+            background-image: 
+                linear-gradient(to right, rgba(30, 58, 138, 0.12) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(30, 58, 138, 0.12) 1px, transparent 1px);
+        }
+        /* Scrollbar personnalisée */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #091124;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e3a8a;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3b82f6;
+        }
+        /* Styles de la carte SVG */
+        .country-path {
+            transition: fill 0.25s ease, stroke 0.2s ease, opacity 0.2s ease;
+            cursor: pointer;
+            vector-effect: non-scaling-stroke;
+        }
+        .country-path:hover {
+            filter: brightness(1.3);
+            stroke: #38bdf8 !important;
+            stroke-width: 1.5px !important;
+        }
+        .country-selected {
+            stroke: #00f0ff !important;
+            stroke-width: 2px !important;
+            filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.5));
+        }
+        /* Animation trajectoire de vol */
+        @keyframes dashDraw {
+            to {
+                stroke-dashoffset: -40;
+            }
+        }
+        .flight-route-arc {
+            stroke-dasharray: 6, 4;
+            animation: dashDraw 2s linear infinite;
+        }
+        /* Blocs de canaux interactifs */
+        .channel-pill {
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .channel-pill:hover {
+            transform: translateY(-2px);
+        }
+        .channel-pill.active-filter {
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+            border-color: #38bdf8 !important;
+        }
+    </style>
+</head>
+<body class="bg-radar-grid min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- EN-TÊTE AVIONIQUE -->
+    <header class="border-b border-slate-800/80 bg-avionics-900/90 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-6 py-3">
+        <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-4">
+            <!-- Logo & Titre -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500/20 via-slate-900 to-cyan-500/20 flex items-center justify-center shadow-lg shadow-rose-500/10 border border-rose-500/30 relative">
+                    <!-- Logo Wi-Fi barré (Wi-Fi Off) vectoriel SVG -->
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- Ligne diagonale de coupure -->
+                        <line x1="2" y1="2" x2="22" y2="22" stroke="#f43f5e" stroke-width="2.5"></line>
+                        <!-- Ondes Wi-Fi avec interruptions -->
+                        <path d="M8.5 16.5a5 5 0 0 1 7 0" stroke="#38bdf8"></path>
+                        <path d="M2 8.82a15 15 0 0 1 4.177-2.643" stroke="#38bdf8"></path>
+                        <path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76" stroke="#38bdf8"></path>
+                        <path d="M16.85 11.25a10 10 0 0 1 2.22 1.68" stroke="#38bdf8"></path>
+                        <path d="M5 13a10 10 0 0 1 5.24-2.76" stroke="#38bdf8"></path>
+                        <circle cx="12" cy="20" r="1" fill="#38bdf8" stroke="none"></circle>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-bold tracking-wider text-white font-mono">Aero WiFi <span class="text-cyan-400">2030</span></h1>
+                        <span id="ui-wrc-tag" class="px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-full">UIT WRC-27 / Wi-Fi 8</span>
+                    </div>
+                    <p id="ui-header-subtitle" class="text-xs text-slate-400">Cartographie Réglementaire Mondiale des Fréquences & Canaux Wi-Fi en Cabine (WAS/RLAN)</p>
+                </div>
+            </div>
+
+            <!-- Contrôles d'Environnement de Vol & Sélecteur de Langue -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Sélecteur de Langue FR / EN -->
+                <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-1 flex items-center gap-1 shadow-inner">
+                    <button id="lang-btn-fr" onclick="setLanguage('fr')" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                        FR
+                    </button>
+                    <button id="lang-btn-en" onclick="setLanguage('en')" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all text-slate-400 hover:text-slate-200">
+                        EN
+                    </button>
+                </div>
+
+                <!-- Phase de Vol -->
+                <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-1 flex items-center gap-1">
+                    <button id="phase-cruise" onclick="setFlightPhase('cruise')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                        <i class="fa-solid fa-cloud"></i>
+                        <span id="ui-btn-cruise">Croisière (&gt; FL100 / 10 000 ft)</span>
+                    </button>
+                    <button id="phase-ground" onclick="setFlightPhase('ground')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-cart-flatbed-suitcase"></i>
+                        <span id="ui-btn-ground">Gate-to-Gate (Sol &amp; Basse Alt.)</span>
+                    </button>
+                </div>
+
+                <!-- Sélecteur de Simulateur de Route -->
+                <div class="bg-slate-950/90 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2">
+                    <i class="fa-solid fa-route text-cyan-400 text-xs"></i>
+                    <span id="ui-corridor-label" class="text-xs text-slate-400 hidden sm:inline">Corridor 2030 :</span>
+                    <select id="route-selector" onchange="selectFlightRoute(this.value)" class="bg-transparent text-xs font-mono text-slate-200 focus:outline-none cursor-pointer">
+                        <!-- Options insérées dynamiquement via JS selon la langue -->
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- COLONNE GAUCHE / CENTRALE : CARTE MONDIALE & SPECTRE INTERACTIF (8 COLONNES) -->
+        <div class="lg:col-span-8 flex flex-col gap-5">
+
+            <!-- BARRE DE FILTRAGE PAR BANDE DE FRÉQUENCES (INVERSE FILTERING) -->
+            <div class="bg-avionics-900/80 border border-slate-800/90 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
+                <!-- Bannière d'application stricte Décision UE 2022/179 (Échéance 2029) -->
+                <div class="mb-3 px-3.5 py-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                        <span class="text-rose-200">
+                            <strong id="ui-eu-banner-title">Règle UE 2029 active :</strong> <span id="ui-eu-banner-text">Interdiction totale des 16 canaux 5 GHz U-NII-2A/2C (Ch 52 à 144) dans les aéronefs sur l'espace européen (Décision UE 2022/179).</span>
+                        </span>
+                    </div>
+                    <span id="ui-eu-banner-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold uppercase">
+                        Horizon 2030 Conforme
+                    </span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <h2 id="ui-filter-title" class="text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold">
+                            1. Filtrer la Carte Mondiale par Bande ou Canal (Mode Inverse)
+                        </h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="active-filter-badge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                            Filtre actif : Vue Globale Multi-Bandes
+                        </span>
+                        <button onclick="resetChannelFilter()" class="text-xs text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/60 hover:bg-slate-800">
+                            <i class="fa-solid fa-rotate-left text-[10px]"></i> <span id="ui-btn-reset">Réinitialiser</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Boutons de sélection de bandes 2030 -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2" id="band-filter-buttons">
+                    <button onclick="setBandFilter('ALL')" data-band="ALL" class="band-btn active px-2.5 py-2 rounded-xl border text-left transition-all bg-cyan-500/20 border-cyan-400 text-white">
+                        <div class="text-[10px] font-mono text-cyan-300">GLOBAL</div>
+                        <div id="btn-band-all-title" class="text-xs font-bold truncate">Toutes Bandes</div>
+                        <div id="btn-band-all-sub" class="text-[10px] text-slate-400">Indice 2030</div>
+                    </button>
+                    <button onclick="setBandFilter('2.4G')" data-band="2.4G" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div class="text-[10px] font-mono text-emerald-400">2.4 GHz</div>
+                        <div id="btn-band-24-title" class="text-xs font-bold text-slate-200 truncate">ISM Legacy</div>
+                        <div class="text-[10px] text-slate-400">Ch 1 - 13</div>
+                    </button>
+                    <button onclick="setBandFilter('UNII-1')" data-band="UNII-1" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div id="btn-band-unii1-sub" class="text-[10px] font-mono text-emerald-400">5 GHz Bas</div>
+                        <div class="text-xs font-bold text-slate-200 truncate">U-NII-1</div>
+                        <div id="btn-band-unii1-note" class="text-[10px] text-slate-400">Ch 36 - 48 (Seul 5G UE)</div>
+                    </button>
+                    <button onclick="setBandFilter('UNII-2')" data-band="UNII-2" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div class="text-[10px] font-mono text-rose-400">5 GHz DFS</div>
+                        <div class="text-xs font-bold text-slate-200 truncate">U-NII-2A/2C</div>
+                        <div id="btn-band-unii2-note" class="text-[10px] text-rose-400/90 font-mono">Banni UE 2029</div>
+                    </button>
+                    <button onclick="setBandFilter('UNII-3')" data-band="UNII-3" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div id="btn-band-unii3-sub" class="text-[10px] font-mono text-sky-400">5 GHz Haut</div>
+                        <div class="text-xs font-bold text-slate-200 truncate">U-NII-3</div>
+                        <div class="text-[10px] text-slate-400">Ch 149 - 165</div>
+                    </button>
+                    <button onclick="setBandFilter('UNII-5')" data-band="UNII-5" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div id="btn-band-unii5-sub" class="text-[10px] font-mono text-indigo-400">6 GHz Bas</div>
+                        <div class="text-xs font-bold text-slate-200 truncate">U-NII-5 (LPI)</div>
+                        <div class="text-[10px] text-slate-400">5925-6425 MHz</div>
+                    </button>
+                    <button onclick="setBandFilter('UNII-7')" data-band="UNII-7" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div id="btn-band-unii7-sub" class="text-[10px] font-mono text-purple-400">6 GHz Haut</div>
+                        <div class="text-xs font-bold text-slate-200 truncate">U-NII-6/7/8</div>
+                        <div class="text-[10px] text-slate-400">6425-7125 MHz</div>
+                    </button>
+                    <button onclick="setBandFilter('60G')" data-band="60G" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
+                        <div class="text-[10px] font-mono text-pink-400">60 GHz</div>
+                        <div class="text-xs font-bold text-slate-200 truncate">mmWave IFE</div>
+                        <div id="btn-band-60g-sub" class="text-[10px] text-slate-400">Cabine 802.11bn</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTENEUR DE LA CARTE MONDIALE INTERACTIVE -->
+            <div class="bg-avionics-900/90 border border-slate-800/90 rounded-2xl relative overflow-hidden flex flex-col shadow-2xl min-h-[420px] sm:min-h-[480px]">
+                <!-- Barre supérieure de la carte -->
+                <div class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                    <!-- Recherche rapide de pays / juridiction -->
+                    <div class="pointer-events-auto relative w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input id="country-search" type="text" oninput="handleCountrySearch(this.value)" placeholder="Rechercher un pays (ex: France, Japon, Brésil)..." 
+                            class="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400 backdrop-blur-md">
+                        <div id="search-dropdown" class="hidden absolute left-0 right-0 mt-1 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-30 divide-y divide-slate-800/60"></div>
+                    </div>
+
+                    <!-- Contrôles de Zoom -->
+                    <div class="pointer-events-auto flex items-center gap-1 bg-slate-950/90 border border-slate-800 rounded-xl p-1 backdrop-blur-md">
+                        <button onclick="zoomMap(1.4)" title="Zoomer" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-xs transition-colors">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                        <button onclick="zoomMap(0.7)" title="Dézoomer" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-xs transition-colors">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <button onclick="resetMapZoom()" title="Réinitialiser la vue" class="px-2 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-[11px] font-mono transition-colors">
+                            1:1
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Zone SVG de la Carte -->
+                <div id="map-container" class="w-full flex-1 relative flex items-center justify-center bg-[#050b18] cursor-grab active:cursor-grabbing">
+                    <svg id="world-map-svg" class="w-full h-[420px] sm:h-[460px] block"></svg>
+
+                    <!-- Infobulle flottante au survol -->
+                    <div id="map-tooltip" class="hidden pointer-events-none absolute z-20 bg-slate-950/95 border border-cyan-500/40 rounded-xl p-3 shadow-2xl backdrop-blur-md min-w-[210px]">
+                        <div class="flex items-center justify-between gap-3 border-b border-slate-800 pb-1.5 mb-2">
+                            <span id="tt-country" class="font-bold text-xs text-white">Pays</span>
+                            <span id="tt-reg" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300">AUTORITÉ</span>
+                        </div>
+                        <div id="tt-status" class="text-xs font-medium mb-1">Statut</div>
+                        <div id="tt-details" class="text-[11px] font-mono text-slate-400">Détails</div>
+                    </div>
+                </div>
+
+                <!-- Légende de la Carte -->
+                <div class="bg-slate-950/90 border-t border-slate-800/80 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block shadow-sm shadow-emerald-500/50"></span>
+                            <span id="ui-leg-allowed" class="text-slate-300 text-[11px]">Autorisé (Gate-to-Gate / LPI Cabine)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-sm bg-amber-500 inline-block shadow-sm shadow-amber-500/50"></span>
+                            <span id="ui-leg-conditional" class="text-slate-300 text-[11px]">Sous conditions (AFC / &gt;10 000 ft / DFS)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-sm bg-rose-600 inline-block shadow-sm shadow-rose-600/50"></span>
+                            <span id="ui-leg-forbidden" class="text-slate-300 text-[11px]">Interdit à bord (Protégé IMT-2030 / FSS / Radar)</span>
+                        </div>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-400">
+                        <i class="fa-solid fa-hand-pointer text-cyan-400 mr-1"></i> <span id="ui-leg-hint">Cliquez sur un pays pour inspecter ses canaux</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EXPLORATEUR INTERACTIF DES CANAUX WI-FI (2.4 GHz, 5 GHz, 6 GHz) -->
+            <div class="bg-avionics-900/80 border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h2 id="ui-analyzer-title" class="text-xs font-mono uppercase tracking-wider text-cyan-400 font-semibold flex items-center gap-2">
+                            <i class="fa-solid fa-wave-square"></i>
+                            2. Analyseur Spectral &amp; Sélection Directe de Canal Wi-Fi (802.11be / 802.11bn)
+                        </h2>
+                        <p id="ui-analyzer-subtitle" class="text-[11px] text-slate-400 mt-0.5">
+                            Cliquez sur un canal spécifique ci-dessous pour filtrer instantanément les espaces aériens où il est autorisé en 2030.
+                        </p>
+                    </div>
+                    <!-- Filtre de largeur de canal -->
+                    <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-1 text-[11px] font-mono">
+                        <span id="ui-width-label" class="text-slate-400 px-2">Largeur :</span>
+                        <button onclick="highlightChannelWidth(20)" class="ch-width-btn px-2 py-0.5 rounded bg-slate-800 text-cyan-300">20 MHz</button>
+                        <button onclick="highlightChannelWidth(80)" class="ch-width-btn px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400">80 MHz</button>
+                        <button onclick="highlightChannelWidth(160)" class="ch-width-btn px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400">160 MHz</button>
+                        <button onclick="highlightChannelWidth(320)" class="ch-width-btn px-2 py-0.5 rounded hover:bg-slate-800 text-slate-400">320 MHz</button>
+                    </div>
+                </div>
+
+                <!-- Grille visuelle des canaux par sous-bande -->
+                <div id="spectrum-visualizer" class="space-y-3">
+                    <!-- Généré dynamiquement par JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- COLONNE DROITE : INSPECTEUR RÉGLEMENTAIRE & DÉTAILS DU PAYS / CORRIDOR (4 COLONNES) -->
+        <div class="lg:col-span-4 flex flex-col gap-5">
+
+            <!-- CARTE D'IDENTITÉ DE LA JURIDICTION SÉLECTIONNÉE -->
+            <div class="bg-avionics-900/90 border border-slate-800/90 rounded-2xl p-5 shadow-xl flex flex-col gap-4 relative overflow-hidden">
+                <div class="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <!-- En-tête du pays sélectionné -->
+                <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span id="inspector-region-tag" class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                UIT Région 1 • CEPT
+                            </span>
+                            <span id="inspector-iso" class="text-xs font-mono text-slate-400">FRA</span>
+                        </div>
+                        <h2 id="inspector-country-name" class="text-xl font-bold text-white mt-1">France</h2>
+                        <p id="inspector-authority" class="text-xs text-slate-400 mt-0.5">Autorité : ANFR / CEPT ECC</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="ui-insp-score-label" class="text-[10px] font-mono text-slate-400 uppercase">Score Spectre</div>
+                        <div id="inspector-score" class="text-2xl font-bold font-mono text-emerald-400">88%</div>
+                    </div>
+                </div>
+
+                <!-- Paramètres Techniques Avioniques 2030 -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5">
+                        <div id="ui-insp-maxbw-title" class="text-[10px] font-mono text-slate-400">Bande Passante Max</div>
+                        <div id="inspector-max-bw" class="text-sm font-bold font-mono text-cyan-300 mt-0.5">320 MHz</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">Canaux 6 GHz LPI</div>
+                    </div>
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5">
+                        <div id="ui-insp-hullloss-title" class="text-[10px] font-mono text-slate-400">Atténuation Fuselage</div>
+                        <div id="inspector-hull-loss" class="text-sm font-bold font-mono text-emerald-400 mt-0.5">&ge; 25 dB</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">A350 / B787 / A321XLR</div>
+                    </div>
+                    <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5">
+                        <div id="ui-insp-afc-title" class="text-[10px] font-mono text-slate-400">Système AFC 2030</div>
+                        <div id="inspector-afc" class="text-sm font-bold font-mono text-amber-400 mt-0.5">Requis &gt;6.4G</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">GNSS Geo-location</div>
+                    </div>
+                </div>
+
+                <!-- Liste Détaillée des Bandes pour ce Pays -->
+                <div>
+                    <div class="flex items-center justify-between mb-2.5">
+                        <h3 id="ui-insp-bands-title" class="text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold">
+                            Allocation Détaillée par Sous-Bande (2030)
+                        </h3>
+                        <span id="inspector-phase-label" class="text-[10px] font-mono text-cyan-400">Mode : Croisière (&gt;FL100)</span>
+                    </div>
+                    <div id="inspector-bands-list" class="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                        <!-- Injecté via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Note Réglementaire Spécifique -->
+                <div class="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3 text-xs text-slate-300 leading-relaxed">
+                    <div class="font-mono text-[11px] text-cyan-300 font-semibold mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-info"></i> <span id="ui-insp-directive-title">Directive Aéronautique 2030 :</span>
+                    </div>
+                    <p id="inspector-notes" class="text-[11px] text-slate-300">
+                        Sélectionnez un pays sur la carte pour consulter les règles d'émission PIRE (EIRP) à bord.
+                    </p>
+                </div>
+            </div>
+
+            <!-- PANNEAU SIMULATEUR DE COMMUTATION AUTOMATIQUE EN VOL (ONBOARD NETWORK CONTROLLER) -->
+            <div class="bg-avionics-900/90 border border-slate-800/90 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <h3 id="ui-handover-title" class="text-xs font-mono uppercase tracking-wider text-cyan-400 font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-satellite-dish"></i>
+                        3. Plan de Commutation Automatique (ONC)
+                    </h3>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">ISO/IEC Aero-WiFi 2030</span>
+                </div>
+                <p id="ui-handover-subtitle" class="text-[11px] text-slate-400">
+                    Simulation de l'adaptation dynamique des points d'accès cabine lors du franchissement des frontières FIR :
+                </p>
+                <div id="flight-handover-timeline" class="space-y-2.5 text-xs">
+                    <!-- Rempli par JS selon la route -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- PIED DE PAGE -->
+    <footer class="border-t border-slate-800/80 bg-avionics-950 px-6 py-3 mt-auto text-[11px] text-slate-400">
+        <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <span class="font-mono text-cyan-400 font-semibold">Aero WiFi 2030</span> — <span id="ui-footer-text">Base de données prospective basée sur les résolutions UIT WRC-23 / WRC-27, FCC Part 15E, CEPT ECC/DEC/(24)01 et ARINC 848.</span>
+            </div>
+            <div class="flex items-center gap-4 font-mono">
+                <span id="ui-footer-standard">Standard Cabine : IEEE 802.11be (Wi-Fi 7) &amp; 802.11bn (Wi-Fi 8)</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- LOGIQUE APPLICATIVE JAVASCRIPT & I18N -->
+    <script>
+        /***********************************************************************
+         * 0. SYSTÈME DE TRADUCTION BILINGUE (FRANÇAIS / ANGLAIS)
+         ***********************************************************************/
+        const TRANSLATIONS = {
+            fr: {
+                docTitle: "Aero WiFi 2030 | Gestion Mondiale du Spectre Wi-Fi Aviation Commerciale",
+                headerSubtitle: "Cartographie Réglementaire Mondiale des Fréquences & Canaux Wi-Fi en Cabine (WAS/RLAN)",
+                uitTag: "UIT WRC-27 / Wi-Fi 8",
+                btnCruise: "Croisière (> FL100 / 10 000 ft)",
+                btnGround: "Gate-to-Gate (Sol & Basse Alt.)",
+                corridorLabel: "Corridor 2030 :",
+                noActiveRoute: "-- Aucun vol actif --",
+                euBannerTitle: "Règle UE 2029 active :",
+                euBannerText: "Interdiction totale des 16 canaux 5 GHz U-NII-2A/2C (Ch 52 à 144) dans les aéronefs sur l'espace européen (Décision UE 2022/179).",
+                euBannerBadge: "Horizon 2030 Conforme",
+                filterTitle: "1. Filtrer la Carte Mondiale par Bande ou Canal (Mode Inverse)",
+                filterActiveDefault: "Filtre actif : Vue Globale Multi-Bandes",
+                filterActiveBand: "Filtre Bande : ",
+                filterActiveChannel: "Filtre Canal : ",
+                btnReset: "Réinitialiser",
+                bandAllTitle: "Toutes Bandes",
+                bandAllSub: "Indice 2030",
+                band24Title: "ISM Legacy",
+                bandUnii1Sub: "5 GHz Bas",
+                bandUnii1Note: "Ch 36 - 48 (Seul 5G UE)",
+                bandUnii2Note: "Banni UE 2029",
+                bandUnii3Sub: "5 GHz Haut",
+                bandUnii5Sub: "6 GHz Bas",
+                bandUnii7Sub: "6 GHz Haut",
+                band60gSub: "Cabine 802.11bn",
+                searchPlaceholder: "Rechercher un pays (ex: France, Japon, Brésil)...",
+                legAllowed: "Autorisé (Gate-to-Gate / LPI Cabine)",
+                legConditional: "Sous conditions (AFC / >10 000 ft / DFS)",
+                legForbidden: "Interdit à bord (Protégé IMT-2030 / FSS / Radar)",
+                legHint: "Cliquez sur un pays pour inspecter ses canaux",
+                analyzerTitle: "2. Analyseur Spectral & Sélection Directe de Canal Wi-Fi (802.11be / 802.11bn)",
+                analyzerSubtitle: "Cliquez sur un canal spécifique ci-dessous pour filtrer instantanément les espaces aériens où il est autorisé en 2030.",
+                widthLabel: "Largeur :",
+                inspScoreLabel: "Score Spectre",
+                inspMaxBwTitle: "Bande Passante Max",
+                inspHullLossTitle: "Atténuation Fuselage",
+                inspAfcTitle: "Système AFC 2030",
+                inspBandsTitle: "Allocation Détaillée par Sous-Bande (2030)",
+                inspDirectiveTitle: "Directive Aéronautique 2030 :",
+                modeCruise: "Mode : Croisière (>FL100)",
+                modeGround: "Mode : Gate-to-Gate (Sol)",
+                handoverTitle: "3. Plan de Commutation Automatique (ONC)",
+                handoverSubtitle: "Simulation de l'adaptation dynamique des points d'accès cabine lors du franchissement des frontières FIR :",
+                footerText: "Base de données prospective basée sur les résolutions UIT WRC-23 / WRC-27, FCC Part 15E, CEPT ECC/DEC/(24)01 et ARINC 848.",
+                footerStandard: "Standard Cabine : IEEE 802.11be (Wi-Fi 7) & 802.11bn (Wi-Fi 8)",
+                ttStatusAllowed: "● Autorisé en Cabine",
+                ttStatusConditional: "▲ Autorisé sous Conditions",
+                ttStatusForbidden: "✖ Restreint / Interdit",
+                badgeAllowed: "AUTORISÉ",
+                badgeConditional: "CONDITIONNEL",
+                badgeForbidden: "INTERDIT",
+                eirpLabel: "PIRE Max :",
+                inCabin: "en cabine"
+            },
+            en: {
+                docTitle: "Aero WiFi 2030 | Global In-Flight Wi-Fi Spectrum Management",
+                headerSubtitle: "Global Regulatory Mapping of Aircraft In-Cabin Wi-Fi Frequencies & Channels (WAS/RLAN)",
+                uitTag: "ITU WRC-27 / Wi-Fi 8",
+                btnCruise: "Cruise (> FL100 / 10,000 ft)",
+                btnGround: "Gate-to-Gate (Ground & Low Alt.)",
+                corridorLabel: "2030 Corridor:",
+                noActiveRoute: "-- No active flight --",
+                euBannerTitle: "Active EU 2029 Rule:",
+                euBannerText: "Complete ban of all 16 5 GHz U-NII-2A/2C channels (Ch 52 to 144) in aircraft across European airspace (EU Decision 2022/179).",
+                euBannerBadge: "2030 Compliant",
+                filterTitle: "1. Filter Global Map by Band or Channel (Inverse Mode)",
+                filterActiveDefault: "Active Filter: Multi-Band Global Overview",
+                filterActiveBand: "Band Filter: ",
+                filterActiveChannel: "Channel Filter: ",
+                btnReset: "Reset",
+                bandAllTitle: "All Bands",
+                bandAllSub: "2030 Index",
+                band24Title: "ISM Legacy",
+                bandUnii1Sub: "5 GHz Low",
+                bandUnii1Note: "Ch 36 - 48 (Sole EU 5G)",
+                bandUnii2Note: "EU 2029 Banned",
+                bandUnii3Sub: "5 GHz High",
+                bandUnii5Sub: "6 GHz Low",
+                bandUnii7Sub: "6 GHz High",
+                band60gSub: "802.11bn Cabin",
+                searchPlaceholder: "Search a country (e.g. France, Japan, Brazil)...",
+                legAllowed: "Authorized (Gate-to-Gate / In-Cabin LPI)",
+                legConditional: "Conditional (AFC / >10,000 ft / DFS)",
+                legForbidden: "Prohibited on board (IMT-2030 / FSS / Radar protected)",
+                legHint: "Click on a country to inspect its authorized channels",
+                analyzerTitle: "2. Spectral Analyzer & Direct Wi-Fi Channel Selection (802.11be / 802.11bn)",
+                analyzerSubtitle: "Click on any specific channel below to instantly highlight global airspaces where it is permitted in 2030.",
+                widthLabel: "Width:",
+                inspScoreLabel: "Spectrum Score",
+                inspMaxBwTitle: "Max Bandwidth",
+                inspHullLossTitle: "Fuselage Attenuation",
+                inspAfcTitle: "2030 AFC System",
+                inspBandsTitle: "Detailed Sub-Band Allocation (2030)",
+                inspDirectiveTitle: "2030 Aviation Directive:",
+                modeCruise: "Mode: Cruise (>FL100)",
+                modeGround: "Mode: Gate-to-Gate (Ground)",
+                handoverTitle: "3. Automated Handover Plan (ONC)",
+                handoverSubtitle: "Simulation of dynamic cabin access point reconfiguration across FIR border crossings:",
+                footerText: "Prospective spectrum database based on ITU WRC-23 / WRC-27 resolutions, FCC Part 15E, CEPT ECC/DEC/(24)01, and ARINC 848.",
+                footerStandard: "Cabin Standard: IEEE 802.11be (Wi-Fi 7) & 802.11bn (Wi-Fi 8)",
+                ttStatusAllowed: "● In-Cabin Authorized",
+                ttStatusConditional: "▲ Conditional Authorization",
+                ttStatusForbidden: "✖ Prohibited / Restricted",
+                badgeAllowed: "AUTHORIZED",
+                badgeConditional: "CONDITIONAL",
+                badgeForbidden: "PROHIBITED",
+                eirpLabel: "Max EIRP:",
+                inCabin: "in-cabin"
+            }
+        };
+
+        /***********************************************************************
+         * 1. BASE DE DONNÉES RÉGLEMENTAIRE MONDIALE 2030 (AVIATION COMMERCIALE)
+         ***********************************************************************/
+        const BANDS_CATALOG = [
+            {
+                id: '2.4G',
+                name: { fr: '2.4 GHz (ISM)', en: '2.4 GHz (ISM)' },
+                range: '2400 – 2483.5 MHz',
+                color: '#10b981',
+                channels: [
+                    { ch: 1, freq: 2412, bw: 20 },
+                    { ch: 6, freq: 2437, bw: 20 },
+                    { ch: 11, freq: 2462, bw: 20 },
+                    { ch: 13, freq: 2472, bw: 20 }
+                ]
+            },
+            {
+                id: 'UNII-1',
+                name: { fr: '5 GHz U-NII-1 (Cabine Standard)', en: '5 GHz U-NII-1 (Standard Cabin)' },
+                range: '5150 – 5250 MHz',
+                color: '#34d399',
+                channels: [
+                    { ch: 36, freq: 5180, bw: 80 },
+                    { ch: 40, freq: 5200, bw: 80 },
+                    { ch: 44, freq: 5220, bw: 80 },
+                    { ch: 48, freq: 5240, bw: 80 }
+                ]
+            },
+            {
+                id: 'UNII-2',
+                name: { fr: '5 GHz U-NII-2A/2C (DFS / Météo - Banni UE)', en: '5 GHz U-NII-2A/2C (DFS / Weather - EU Banned)' },
+                range: '5250 – 5725 MHz',
+                color: '#f59e0b',
+                channels: [
+                    { ch: 52, freq: 5260, bw: 80, euBan: true },
+                    { ch: 56, freq: 5280, bw: 80, euBan: true },
+                    { ch: 60, freq: 5300, bw: 80, euBan: true },
+                    { ch: 64, freq: 5320, bw: 80, euBan: true },
+                    { ch: 100, freq: 5500, bw: 160, euBan: true },
+                    { ch: 116, freq: 5580, bw: 80, euBan: true },
+                    { ch: 124, freq: 5620, bw: 20, tdwr: true, euBan: true },
+                    { ch: 132, freq: 5660, bw: 80, euBan: true },
+                    { ch: 140, freq: 5700, bw: 40, euBan: true },
+                    { ch: 144, freq: 5720, bw: 20, euBan: true }
+                ]
+            },
+            {
+                id: 'UNII-3',
+                name: { fr: '5 GHz U-NII-3 (Haut Débit)', en: '5 GHz U-NII-3 (High Throughput)' },
+                range: '5725 – 5850 MHz',
+                color: '#38bdf8',
+                channels: [
+                    { ch: 149, freq: 5745, bw: 80 },
+                    { ch: 153, freq: 5765, bw: 80 },
+                    { ch: 157, freq: 5785, bw: 80 },
+                    { ch: 161, freq: 5805, bw: 80 },
+                    { ch: 165, freq: 5825, bw: 20 }
+                ]
+            },
+            {
+                id: 'UNII-5',
+                name: { fr: '6 GHz Bas U-NII-5 (Wi-Fi 7/8 LPI)', en: '6 GHz Low U-NII-5 (Wi-Fi 7/8 LPI)' },
+                range: '5925 – 6425 MHz',
+                color: '#818cf8',
+                channels: [
+                    { ch: '6G-1', label: 'Ch 1', freq: 5955, bw: 160 },
+                    { ch: '6G-33', label: 'Ch 33', freq: 6115, bw: 320 },
+                    { ch: '6G-65', label: 'Ch 65', freq: 6275, bw: 320 },
+                    { ch: '6G-93', label: 'Ch 93', freq: 6415, bw: 80 }
+                ]
+            },
+            {
+                id: 'UNII-7',
+                name: { fr: '6 GHz Haut U-NII-6/7/8 (AFC / IMT Split)', en: '6 GHz Upper U-NII-6/7/8 (AFC / IMT Split)' },
+                range: '6425 – 7125 MHz',
+                color: '#c084fc',
+                channels: [
+                    { ch: '6G-113', label: 'Ch 113', freq: 6515, bw: 160 },
+                    { ch: '6G-145', label: 'Ch 145', freq: 6675, bw: 320 },
+                    { ch: '6G-177', label: 'Ch 177', freq: 6835, bw: 320 },
+                    { ch: '6G-209', label: 'Ch 209', freq: 6995, bw: 160 }
+                ]
+            },
+            {
+                id: '60G',
+                name: { fr: '60 GHz mmWave (Cabine Ultra-Dense IFE)', en: '60 GHz mmWave (Ultra-Dense IFE Cabin)' },
+                range: '57.0 – 71.0 GHz',
+                color: '#f472b6',
+                channels: [
+                    { ch: '60G-1', label: 'mmW Ch 1', freq: 58320, bw: 2160 },
+                    { ch: '60G-2', label: 'mmW Ch 2', freq: 60480, bw: 2160 },
+                    { ch: '60G-3', label: 'mmW Ch 3', freq: 62640, bw: 2160 },
+                    { ch: '60G-4', label: 'mmW Ch 4', freq: 64800, bw: 2160 }
+                ]
+            }
+        ];
+
+        /**
+         * Profils des grandes autorités de régulation spectrale en 2030
+         */
+        const REGULATORY_PROFILES = {
+            FCC_NA: {
+                authority: 'FCC Part 15E / ISED (North America)',
+                regionTag: 'ITU Region 2 • FCC / ISED',
+                maxBw: '320 MHz (Full 6 GHz)',
+                hullLoss: '≥ 20 dB (LPI Air)',
+                afc: { fr: 'Optionnel (LPI Cabine)', en: 'Optional (LPI Cabin)' },
+                score: 96,
+                notes: {
+                    fr: "En 2030, la FCC et ISED autorisent l'intégralité de la bande 6 GHz (5925-7125 MHz) en mode Low Power Indoor (LPI) à bord des aéronefs commerciaux Gate-to-Gate. Les canaux 320 MHz Wi-Fi 7/8 y sont pleinement opérationnels.",
+                    en: "In 2030, FCC and ISED authorize the entire 6 GHz band (5925–7125 MHz) in Low Power Indoor (LPI) mode aboard commercial aircraft Gate-to-Gate. 320 MHz Wi-Fi 7/8 channels are fully operational."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW (20 dBm)', detail: { fr: 'Ch 1–11 autorisés Gate-to-Gate (Ch 12-13 basse puissance).', en: 'Ch 1–11 authorized Gate-to-Gate (Ch 12-13 low power).' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW (24 dBm)', detail: { fr: 'Ch 36–48 autorisés sans restriction en cabine.', en: 'Ch 36–48 fully authorized inside cabin.' } },
+                    'UNII-2': { cruise: 'CONDITIONAL', ground: 'CONDITIONAL', eirp: '250 mW (DFS)', detail: { fr: 'Ch 52–144 avec DFS actif ; Ch 120–128 (TDWR météo) exclus au sol.', en: 'Ch 52–144 with DFS active; Ch 120–128 (TDWR radar) barred on ground.' } },
+                    'UNII-3': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '1000 mW (30 dBm)', detail: { fr: 'Ch 149–165 pleinement autorisés au sol et en vol.', en: 'Ch 149–165 fully authorized on ground and in flight.' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW LPI (5 dBm/MHz)', detail: { fr: '5925–6425 MHz autorisé Gate-to-Gate (canaux 160/320 MHz).', en: '5925–6425 MHz authorized Gate-to-Gate (160/320 MHz channels).' } },
+                    'UNII-7': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '250 mW LPI / AFC', detail: { fr: '6425–7125 MHz autorisé en croisière ; AFC requis sous 10 000 ft.', en: '6425–7125 MHz authorized in cruise; AFC required below 10,000 ft.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm EIRP', detail: { fr: '57–71 GHz libre en cabine (confinement total par le fuselage).', en: '57–71 GHz free in-cabin (total fuselage RF shielding).' } }
+                }
+            },
+            CEPT_EU: {
+                authority: 'CEPT ECC / EASA / ANFR (Europe)',
+                regionTag: 'ITU Region 1 • CEPT',
+                maxBw: '320 MHz (U-NII-5)',
+                hullLoss: '≥ 25 dB certifié',
+                afc: { fr: 'Obligatoire >6425 MHz', en: 'Mandatory >6425 MHz' },
+                score: 82,
+                notes: {
+                    fr: "Conformément à la Décision d'exécution (UE) 2022/179 (expiration du régime transitoire au 31/12/2028), les sous-bandes 5 GHz U-NII-2A et 2C (canaux 52 à 144) sont STRICTEMENT INTERDITES dans les aéronefs depuis le 01/01/2029 pour protéger les radars météo et satellites scientifiques EESS. En 5 GHz, seul U-NII-1 (canaux 36 à 48) reste autorisé en cabine.",
+                    en: "Pursuant to Commission Implementing Decision (EU) 2022/179 (expiration of transitional relief on Dec 31, 2028), the 5 GHz U-NII-2A and 2C sub-bands (channels 52 to 144) are STRICTLY PROHIBITED in aircraft since Jan 1, 2029 to safeguard weather radars and EESS Earth observation satellites. Only U-NII-1 (channels 36 to 48) remains allowed."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW (20 dBm)', detail: { fr: 'Ch 1–13 autorisés Gate-to-Gate.', en: 'Ch 1–13 authorized Gate-to-Gate.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW (23 dBm)', detail: { fr: 'Ch 36–48 autorisés en cabine fermée (seule sous-bande 5 GHz autorisée).', en: 'Ch 36–48 authorized in closed cabin (sole legal 5 GHz sub-band).' } },
+                    'UNII-2': { cruise: 'FORBIDDEN', ground: 'FORBIDDEN', eirp: '0 mW (Interdit UE / Banned)', detail: { fr: 'STRICTEMENT INTERDIT dans les aéronefs depuis le 01/01/2029 (Décision UE 2022/179).', en: 'STRICTLY PROHIBITED in aircraft since 01/01/2029 (EU Decision 2022/179).' } },
+                    'UNII-3': { cruise: 'CONDITIONAL', ground: 'CONDITIONAL', eirp: '25 mW (100 mW atténué)', detail: { fr: 'Ch 149–165 limités à 25 mW SRD (ou 100 mW si fuselage ≥25 dB).', en: 'Ch 149–165 limited to 25 mW SRD (or 100 mW if fuselage loss ≥25 dB).' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW LPI (23 dBm)', detail: { fr: '5945–6425 MHz (Ch 1–93) autorisé Gate-to-Gate en cabine (pivot Wi-Fi 7/8).', en: '5945–6425 MHz (Ch 1–93) authorized Gate-to-Gate (primary Wi-Fi 7/8 band).' } },
+                    'UNII-7': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '100 mW (>FL200 AFC)', detail: { fr: 'Interdit au sol (réservé 6G IMT-2030). Autorisé >20 000 ft avec AFC.', en: 'Prohibited on ground (reserved for 6G IMT). Allowed >20,000 ft with AFC.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm EIRP', detail: { fr: '57–66 GHz autorisé sans licence en cabine.', en: '57–66 GHz license-exempt in-cabin.' } }
+                }
+            },
+            CAAC_CN: {
+                authority: 'MIIT Notice No. 129 [2021] / CAAC CCAR-121 (China)',
+                regionTag: 'ITU Region 3 • MIIT / SRRC',
+                maxBw: '160 MHz (U-NII-1 + U-NII-3)',
+                hullLoss: '≥ 28 dB requis',
+                afc: { fr: 'Non applicable (6G prioritaire)', en: 'N/A (6G prioritized)' },
+                score: 72,
+                notes: {
+                    fr: "Réglementé par l'Avis MIIT n° 129 [2021] (工信部无〔2021〕129号) : La Chine n'alloue PAS la sous-bande U-NII-2C (canaux 100 à 144) au WLAN. Sur 5150–5350 MHz, l'usage est strictement confiné à l'intérieur (cabine fermée) avec DFS non débrayable sur les canaux 52–64 et PIRE limitée à 200 mW. Sur U-NII-3 (canaux 149–165), le plafond est à 500 mW. Le 6 GHz haut (6425–7125 MHz) est exclu du Wi-Fi car réservé à la 5G/6G IMT.",
+                    en: "Regulated under MIIT Notice No. 129 [2021]: China does NOT allocate U-NII-2C (channels 100–144) to WLAN. In 5150–5350 MHz, usage is strictly indoor-confined (closed cabin) with mandatory non-disableable DFS on channels 52–64 and EIRP capped at 200 mW. In U-NII-3 (channels 149–165), EIRP is capped at 500 mW. Upper 6 GHz (6425–7125 MHz) is excluded from Wi-Fi and reserved for IMT 5G/6G."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW (20 dBm)', detail: { fr: 'Ch 1–13 autorisés Gate-to-Gate (conformité LBT/DAA MIIT 129).', en: 'Ch 1–13 authorized Gate-to-Gate (MIIT 129 LBT/DAA compliance).' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW (23 dBm)', detail: { fr: 'Ch 36–48 autorisés en cabine fermée (confinement intérieur MIIT 129).', en: 'Ch 36–48 authorized inside cabin (indoor containment MIIT 129).' } },
+                    'UNII-2': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '200 mW (Ch 52-64 DFS)', detail: { fr: 'Ch 52–64 tolérés en vol (DFS obligatoire non débrayable) ; Ch 100–144 TOTALEMENT EXCLUS (non alloués par le MIIT).', en: 'Ch 52–64 tolerated in flight (mandatory non-disableable DFS); Ch 100–144 TOTALLY EXCLUDED (not allocated by MIIT).' } },
+                    'UNII-3': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '500 mW (27 dBm)', detail: { fr: 'Ch 149–165 bande principale cabine haute capacité en Chine (Avis 129).', en: 'Ch 149–165 primary high-capacity cabin band in China (Notice 129).' } },
+                    'UNII-5': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '150 mW (>FL100)', detail: { fr: 'Autorisé uniquement au-dessus de 10 000 ft sous supervision CAAC.', en: 'Authorized only above 10,000 ft under CAAC supervision.' } },
+                    'UNII-7': { cruise: 'FORBIDDEN', ground: 'FORBIDDEN', eirp: '0 mW (IMT)', detail: { fr: '6425–7125 MHz strictement réservé aux réseaux mobiles 5G-A/6G terrestres.', en: '6425–7125 MHz strictly reserved for terrestrial 5G-A/6G mobile networks.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '38 dBm EIRP', detail: { fr: '59–64 GHz autorisé pour systèmes IFE cabine.', en: '59–64 GHz authorized for in-cabin IFE systems.' } }
+                }
+            },
+            MIC_JP: {
+                authority: 'MIC / JCAB (Japan)',
+                regionTag: 'ITU Region 3 • MIC',
+                maxBw: '320 MHz (U-NII-5)',
+                hullLoss: '≥ 25 dB certifié',
+                afc: { fr: 'Intégré JCAB', en: 'JCAB Integrated' },
+                score: 90,
+                notes: {
+                    fr: "Le ministère japonais (MIC) autorise le 6 GHz bas (5925-6425 MHz) Gate-to-Gate pour tous les aéronefs équipés Wi-Fi 7/8. En 2030, la bande U-NII-3 (Ch 149-165), autrefois restreinte, est ouverte aux cabines d'avions au-dessus de 10 000 pieds.",
+                    en: "Japan MIC authorizes lower 6 GHz (5925-6425 MHz) Gate-to-Gate for Wi-Fi 7/8 aircraft. In 2030, U-NII-3 (Ch 149-165) is permitted in-cabin above 10,000 ft."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW', detail: { fr: 'Ch 1–13 autorisés sans restriction.', en: 'Ch 1–13 authorized without restriction.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW', detail: { fr: 'Ch 36–48 autorisés Gate-to-Gate.', en: 'Ch 36–48 authorized Gate-to-Gate.' } },
+                    'UNII-2': { cruise: 'CONDITIONAL', ground: 'CONDITIONAL', eirp: '200 mW (DFS)', detail: { fr: 'Ch 52–144 autorisés avec profil radar W53/W56.', en: 'Ch 52–144 authorized with radar profiles W53/W56.' } },
+                    'UNII-3': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '100 mW (>FL100)', detail: { fr: 'Ch 149–165 autorisés en croisière uniquement (>10 000 ft).', en: 'Ch 149–165 authorized during cruise only (>10,000 ft).' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW LPI', detail: { fr: '5925–6425 MHz autorisé Gate-to-Gate (jusqu’à 320 MHz).', en: '5925–6425 MHz authorized Gate-to-Gate (up to 320 MHz).' } },
+                    'UNII-7': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '150 mW (Pacifique)', detail: { fr: 'Autorisé en croisière océanique et >FL200 via AFC.', en: 'Authorized in oceanic cruise and >FL200 via AFC.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm', detail: { fr: '57–66 GHz pleinement autorisé en cabine.', en: '57–66 GHz fully authorized in-cabin.' } }
+                }
+            },
+            CITEL_LATAM: {
+                authority: 'CITEL / ANATEL / IFT (Latin America)',
+                regionTag: 'ITU Region 2 • CITEL',
+                maxBw: '320 MHz (Full 6 GHz)',
+                hullLoss: '≥ 20 dB',
+                afc: { fr: 'Harmonisé CITEL', en: 'CITEL Harmonized' },
+                score: 93,
+                notes: {
+                    fr: "Sous l'impulsion d'ANATEL (Brésil) et de la CITEL, l'Amérique Latine aligne sa réglementation 2030 sur le modèle panaméricain avec ouverture complète des bandes 5 GHz et 6 GHz en cabine.",
+                    en: "Led by ANATEL (Brazil) and CITEL, Latin America aligns its 2030 framework on full 5 GHz and 6 GHz spectrum availability in aircraft cabins."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW', detail: { fr: 'Ch 1–13 autorisés Gate-to-Gate.', en: 'Ch 1–13 authorized Gate-to-Gate.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW', detail: { fr: 'Ch 36–48 autorisés Gate-to-Gate.', en: 'Ch 36–48 authorized Gate-to-Gate.' } },
+                    'UNII-2': { cruise: 'CONDITIONAL', ground: 'CONDITIONAL', eirp: '250 mW (DFS)', detail: { fr: 'Ch 52–144 avec DFS standard.', en: 'Ch 52–144 with standard DFS.' } },
+                    'UNII-3': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '500 mW', detail: { fr: 'Ch 149–165 autorisés sans restriction.', en: 'Ch 149–165 authorized without restriction.' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW LPI', detail: { fr: '5925–6425 MHz autorisé Gate-to-Gate.', en: '5925–6425 MHz authorized Gate-to-Gate.' } },
+                    'UNII-7': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '200 mW LPI', detail: { fr: '6425–7125 MHz autorisé en vol (Brésil, Colombie, Chili).', en: '6425–7125 MHz authorized in flight (Brazil, Colombia, Chile).' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm', detail: { fr: 'Autorisé pour réseaux cabine.', en: 'Authorized for cabin networks.' } }
+                }
+            },
+            GCAA_MEA: {
+                authority: 'GCAA / CST / TRA (Middle East)',
+                regionTag: 'ITU Region 1 • ASMG',
+                maxBw: '320 MHz',
+                hullLoss: '≥ 24 dB',
+                afc: { fr: 'AFC Régional Golfe', en: 'Gulf Regional AFC' },
+                score: 91,
+                notes: {
+                    fr: "Les hubs aériens du Golfe (Émirats Arabes Unis, Arabie Saoudite, Qatar) offrent en 2030 une réglementation ultra-favorable aux flottes long-courriers avec support complet du Wi-Fi 8 sur 6 GHz.",
+                    en: "Gulf hubs (UAE, Saudi Arabia, Qatar) provide high-capacity spectrum regimes for long-haul carriers with full Wi-Fi 8 support on 6 GHz."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW', detail: { fr: 'Ch 1–13 autorisés Gate-to-Gate.', en: 'Ch 1–13 authorized Gate-to-Gate.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW', detail: { fr: 'Ch 36–48 autorisés Gate-to-Gate.', en: 'Ch 36–48 authorized Gate-to-Gate.' } },
+                    'UNII-2': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '200 mW', detail: { fr: 'Ch 52–140 autorisés.', en: 'Ch 52–140 authorized.' } },
+                    'UNII-3': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW', detail: { fr: 'Ch 149–165 autorisés Gate-to-Gate.', en: 'Ch 149–165 authorized Gate-to-Gate.' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW LPI', detail: { fr: '5925–6425 MHz autorisé Gate-to-Gate.', en: '5925–6425 MHz authorized Gate-to-Gate.' } },
+                    'UNII-7': { cruise: 'CONDITIONAL', ground: 'CONDITIONAL', eirp: '200 mW AFC', detail: { fr: '6425–7125 MHz géré par AFC automatique.', en: '6425–7125 MHz managed by automated AFC.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm', detail: { fr: 'Autorisé Gate-to-Gate.', en: 'Authorized Gate-to-Gate.' } }
+                }
+            },
+            APT_APAC: {
+                authority: 'ACMA / IMDA / KCC / WPC (Asia-Pacific & India)',
+                regionTag: 'ITU Region 3 • APT',
+                maxBw: '320 MHz',
+                hullLoss: '≥ 25 dB',
+                afc: { fr: 'Requis >6425 MHz', en: 'Required >6425 MHz' },
+                score: 86,
+                notes: {
+                    fr: "L'Australie, la Corée du Sud, Singapour et l'Inde (WPC 2028) ont harmonisé la bande 6 GHz basse (U-NII-5) pour l'usage en cabine d'aéronef. La Corée du Sud et l'Australie autorisent également le 6 GHz haut en croisière.",
+                    en: "Australia, South Korea, Singapore, and India (WPC) harmonized lower 6 GHz (U-NII-5) for cabin use. South Korea and Australia also permit upper 6 GHz during cruise."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW', detail: { fr: 'Ch 1–13 autorisés Gate-to-Gate.', en: 'Ch 1–13 authorized Gate-to-Gate.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW', detail: { fr: 'Ch 36–48 autorisés Gate-to-Gate.', en: 'Ch 36–48 authorized Gate-to-Gate.' } },
+                    'UNII-2': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '200 mW (DFS)', detail: { fr: 'Autorisé au-dessus de FL100 uniquement.', en: 'Authorized above FL100 only.' } },
+                    'UNII-3': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '250 mW', detail: { fr: 'Ch 149–165 autorisés Gate-to-Gate.', en: 'Ch 149–165 authorized Gate-to-Gate.' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW LPI', detail: { fr: '5925–6425 MHz harmonisé APT en cabine.', en: '5925–6425 MHz harmonized APT in-cabin.' } },
+                    'UNII-7': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '150 mW (>FL150)', detail: { fr: 'Autorisé en croisière haute altitude avec AFC.', en: 'Authorized in high altitude cruise with AFC.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm', detail: { fr: 'Autorisé en cabine.', en: 'Authorized in-cabin.' } }
+                }
+            },
+            ATU_AFRICA: {
+                authority: 'ATU / ICASA / NCC (African Telecoms Union)',
+                regionTag: 'ITU Region 1 • ATU',
+                maxBw: '160 MHz (U-NII-5)',
+                hullLoss: '≥ 25 dB',
+                afc: { fr: 'En déploiement', en: 'Rolling out' },
+                score: 80,
+                notes: {
+                    fr: "Suite aux accords ATU post-WRC-27, la bande 5945-6425 MHz est ouverte aux systèmes WAS/RLAN embarqués sur le continent africain, tandis que le 5 GHz U-NII-3 reste soumis à des limites SRD au sol.",
+                    en: "Following ATU post-WRC-27 agreements, 5945–6425 MHz is open to aircraft WAS/RLAN systems across Africa, with 5 GHz U-NII-3 subject to ground SRD caps."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW', detail: { fr: 'Ch 1–13 autorisés Gate-to-Gate.', en: 'Ch 1–13 authorized Gate-to-Gate.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW', detail: { fr: 'Ch 36–48 autorisés Gate-to-Gate.', en: 'Ch 36–48 authorized Gate-to-Gate.' } },
+                    'UNII-2': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '200 mW (DFS)', detail: { fr: 'Croisière >10 000 ft uniquement.', en: 'Cruise >10,000 ft only.' } },
+                    'UNII-3': { cruise: 'CONDITIONAL', ground: 'CONDITIONAL', eirp: '25 mW / 100 mW', detail: { fr: 'Ch 149–165 autorisés sous plafond SRD.', en: 'Ch 149–165 under SRD power caps.' } },
+                    'UNII-5': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '200 mW LPI', detail: { fr: '5945–6425 MHz autorisé en vol (Gate-to-Gate en Afrique du Sud, Maroc, Kenya).', en: '5945–6425 MHz in flight (Gate-to-Gate in South Africa, Morocco, Kenya).' } },
+                    'UNII-7': { cruise: 'FORBIDDEN', ground: 'FORBIDDEN', eirp: 'FS / IMT Protected', detail: { fr: 'Faisceaux hertziens fixes prioritaires.', en: 'Terrestrial fixed links priority.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '40 dBm', detail: { fr: 'Autorisé en cabine fermée.', en: 'Authorized in closed cabin.' } }
+                }
+            },
+            RCC_EURASIA: {
+                authority: 'GKRCh / RCC (Eurasia)',
+                regionTag: 'ITU Region 1 • RCC',
+                maxBw: '160 MHz',
+                hullLoss: '≥ 28 dB',
+                afc: { fr: 'Contrôle National', en: 'National Registry' },
+                score: 68,
+                notes: {
+                    fr: "Réglementation stricte sur les bandes 5 GHz DFS et 6 GHz en raison de la protection des liaisons satellites fixes (FSS) et radars gouvernementaux. Commutation automatique vers U-NII-1/U-NII-3 recommandée à l'entrée FIR.",
+                    en: "Strict regulations on 5 GHz DFS and 6 GHz to protect Fixed Satellite Services (FSS) and radars. Automated switch to U-NII-1/U-NII-3 recommended upon FIR entry."
+                },
+                bands: {
+                    '2.4G': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '100 mW', detail: { fr: 'Ch 1–13 autorisés.', en: 'Ch 1–13 authorized.' } },
+                    'UNII-1': { cruise: 'ALLOWED', ground: 'ALLOWED', eirp: '200 mW', detail: { fr: 'Ch 36–48 autorisés.', en: 'Ch 36–48 authorized.' } },
+                    'UNII-2': { cruise: 'FORBIDDEN', ground: 'FORBIDDEN', eirp: 'Restricted', detail: { fr: 'Usage aéronautique restreint (radars).', en: 'Aeronautical use restricted (radars).' } },
+                    'UNII-3': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '100 mW', detail: { fr: 'Ch 149–165 autorisés en croisière.', en: 'Ch 149–165 authorized in cruise.' } },
+                    'UNII-5': { cruise: 'CONDITIONAL', ground: 'FORBIDDEN', eirp: '100 mW (>FL150)', detail: { fr: 'Autorisé en haute altitude uniquement.', en: 'Authorized in high altitude only.' } },
+                    'UNII-7': { cruise: 'FORBIDDEN', ground: 'FORBIDDEN', eirp: 'Banned', detail: { fr: 'Réservé services fixes et IMT.', en: 'Reserved for fixed links & IMT.' } },
+                    '60G': { cruise: 'ALLOWED', ground: 'CONDITIONAL', eirp: '35 dBm', detail: { fr: 'Autorisé en cabine.', en: 'Authorized in-cabin.' } }
+                }
+            }
+        };
+
+        /**
+         * Correspondance entre les pays du monde et leur profil réglementaire
+         */
+        const COUNTRY_TO_PROFILE = {
+            "United States of America": { profile: "FCC_NA", frName: "États-Unis d'Amérique", enName: "United States of America", iso: "USA" },
+            "Canada": { profile: "FCC_NA", frName: "Canada", enName: "Canada", iso: "CAN" },
+            "Mexico": { profile: "FCC_NA", frName: "Mexique", enName: "Mexico", iso: "MEX" },
+            "France": { profile: "CEPT_EU", frName: "France", enName: "France", iso: "FRA" },
+            "Germany": { profile: "CEPT_EU", frName: "Allemagne", enName: "Germany", iso: "DEU" },
+            "United Kingdom": { profile: "CEPT_EU", frName: "Royaume-Uni (Ofcom)", enName: "United Kingdom (Ofcom)", iso: "GBR" },
+            "Spain": { profile: "CEPT_EU", frName: "Espagne", enName: "Spain", iso: "ESP" },
+            "Italy": { profile: "CEPT_EU", frName: "Italie", enName: "Italy", iso: "ITA" },
+            "Netherlands": { profile: "CEPT_EU", frName: "Pays-Bas", enName: "Netherlands", iso: "NLD" },
+            "Switzerland": { profile: "CEPT_EU", frName: "Suisse", enName: "Switzerland", iso: "CHE" },
+            "Belgium": { profile: "CEPT_EU", frName: "Belgique", enName: "Belgium", iso: "BEL" },
+            "Portugal": { profile: "CEPT_EU", frName: "Portugal", enName: "Portugal", iso: "PRT" },
+            "Sweden": { profile: "CEPT_EU", frName: "Suède", enName: "Sweden", iso: "SWE" },
+            "Norway": { profile: "CEPT_EU", frName: "Norvège", enName: "Norway", iso: "NOR" },
+            "Finland": { profile: "CEPT_EU", frName: "Finlande", enName: "Finland", iso: "FIN" },
+            "Denmark": { profile: "CEPT_EU", frName: "Danemark", enName: "Denmark", iso: "DNK" },
+            "Poland": { profile: "CEPT_EU", frName: "Pologne", enName: "Poland", iso: "POL" },
+            "Austria": { profile: "CEPT_EU", frName: "Autriche", enName: "Austria", iso: "AUT" },
+            "Greece": { profile: "CEPT_EU", frName: "Grèce", enName: "Greece", iso: "GRC" },
+            "Ireland": { profile: "CEPT_EU", frName: "Irlande", enName: "Ireland", iso: "IRL" },
+            "Turkey": { profile: "CEPT_EU", frName: "Turquie (BTK)", enName: "Turkey (BTK)", iso: "TUR" },
+            "Ukraine": { profile: "CEPT_EU", frName: "Ukraine", enName: "Ukraine", iso: "UKR" },
+            "Romania": { profile: "CEPT_EU", frName: "Roumanie", enName: "Romania", iso: "ROU" },
+            "Czechia": { profile: "CEPT_EU", frName: "Tchéquie", enName: "Czech Republic", iso: "CZE" },
+            "Hungary": { profile: "CEPT_EU", frName: "Hongrie", enName: "Hungary", iso: "HUN" },
+            "Iceland": { profile: "CEPT_EU", frName: "Islande", enName: "Iceland", iso: "ISL" },
+            "China": { profile: "CAAC_CN", frName: "Chine (MIIT / CAAC)", enName: "China (MIIT / CAAC)", iso: "CHN" },
+            "Japan": { profile: "MIC_JP", frName: "Japon (MIC / JCAB)", enName: "Japan (MIC / JCAB)", iso: "JPN" },
+            "Brazil": { profile: "CITEL_LATAM", frName: "Brésil (ANATEL)", enName: "Brazil (ANATEL)", iso: "BRA" },
+            "Argentina": { profile: "CITEL_LATAM", frName: "Argentine (ENACOM)", enName: "Argentina (ENACOM)", iso: "ARG" },
+            "Chile": { profile: "CITEL_LATAM", frName: "Chili (SUBTEL)", enName: "Chile (SUBTEL)", iso: "CHL" },
+            "Colombia": { profile: "CITEL_LATAM", frName: "Colombie (ANE)", enName: "Colombia (ANE)", iso: "COL" },
+            "Peru": { profile: "CITEL_LATAM", frName: "Pérou (MTC)", enName: "Peru (MTC)", iso: "PER" },
+            "Venezuela": { profile: "CITEL_LATAM", frName: "Venezuela", enName: "Venezuela", iso: "VEN" },
+            "Uruguay": { profile: "CITEL_LATAM", frName: "Uruguay", enName: "Uruguay", iso: "URY" },
+            "Ecuador": { profile: "CITEL_LATAM", frName: "Équateur", enName: "Ecuador", iso: "ECU" },
+            "Bolivia": { profile: "CITEL_LATAM", frName: "Bolivie", enName: "Bolivia", iso: "BOL" },
+            "Paraguay": { profile: "CITEL_LATAM", frName: "Paraguay", enName: "Paraguay", iso: "PRY" },
+            "Panama": { profile: "CITEL_LATAM", frName: "Panama", enName: "Panama", iso: "PAN" },
+            "Costa Rica": { profile: "CITEL_LATAM", frName: "Costa Rica", enName: "Costa Rica", iso: "CRI" },
+            "Cuba": { profile: "CITEL_LATAM", frName: "Cuba", enName: "Cuba", iso: "CUB" },
+            "Dominican Rep.": { profile: "CITEL_LATAM", frName: "Rép. Dominicaine", enName: "Dominican Republic", iso: "DOM" },
+            "United Arab Emirates": { profile: "GCAA_MEA", frName: "Émirats Arabes Unis (TDRA)", enName: "United Arab Emirates (TDRA)", iso: "ARE" },
+            "Saudi Arabia": { profile: "GCAA_MEA", frName: "Arabie Saoudite (CST)", enName: "Saudi Arabia (CST)", iso: "SAU" },
+            "Qatar": { profile: "GCAA_MEA", frName: "Qatar (CRA)", enName: "Qatar (CRA)", iso: "QAT" },
+            "Oman": { profile: "GCAA_MEA", frName: "Oman", enName: "Oman", iso: "OMN" },
+            "Kuwait": { profile: "GCAA_MEA", frName: "Koweït", enName: "Kuwait", iso: "KWT" },
+            "Israel": { profile: "GCAA_MEA", frName: "Israël", enName: "Israel", iso: "ISR" },
+            "Jordan": { profile: "GCAA_MEA", frName: "Jordanie", enName: "Jordan", iso: "JOR" },
+            "Iraq": { profile: "GCAA_MEA", frName: "Irak", enName: "Iraq", iso: "IRQ" },
+            "Iran": { profile: "RCC_EURASIA", frName: "Iran", enName: "Iran", iso: "IRN" },
+            "Australia": { profile: "APT_APAC", frName: "Australie (ACMA)", enName: "Australia (ACMA)", iso: "AUS" },
+            "New Zealand": { profile: "APT_APAC", frName: "Nouvelle-Zélande (RSM)", enName: "New Zealand (RSM)", iso: "NZL" },
+            "India": { profile: "APT_APAC", frName: "Inde (WPC / DGCA)", enName: "India (WPC / DGCA)", iso: "IND" },
+            "South Korea": { profile: "APT_APAC", frName: "Corée du Sud (MSIT)", enName: "South Korea (MSIT)", iso: "KOR" },
+            "Thailand": { profile: "APT_APAC", frName: "Thaïlande (NBTC)", enName: "Thailand (NBTC)", iso: "THA" },
+            "Vietnam": { profile: "APT_APAC", frName: "Viêt Nam", enName: "Vietnam", iso: "VNM" },
+            "Indonesia": { profile: "APT_APAC", frName: "Indonésie (SDPPI)", enName: "Indonesia (SDPPI)", iso: "IDN" },
+            "Malaysia": { profile: "APT_APAC", frName: "Malaisie (MCMC)", enName: "Malaysia (MCMC)", iso: "MYS" },
+            "Philippines": { profile: "APT_APAC", frName: "Philippines", enName: "Philippines", iso: "PHL" },
+            "Pakistan": { profile: "APT_APAC", frName: "Pakistan", enName: "Pakistan", iso: "PAK" },
+            "Bangladesh": { profile: "APT_APAC", frName: "Bangladesh", enName: "Bangladesh", iso: "BGD" },
+            "Taiwan": { profile: "APT_APAC", frName: "Taïwan (NCC)", enName: "Taiwan (NCC)", iso: "TWN" },
+            "Russia": { profile: "RCC_EURASIA", frName: "Russie (GKRCh)", enName: "Russia (GKRCh)", iso: "RUS" },
+            "Kazakhstan": { profile: "RCC_EURASIA", frName: "Kazakhstan", enName: "Kazakhstan", iso: "KAZ" },
+            "Uzbekistan": { profile: "RCC_EURASIA", frName: "Ouzbékistan", enName: "Uzbekistan", iso: "UZB" },
+            "Mongolia": { profile: "RCC_EURASIA", frName: "Mongolie", enName: "Mongolia", iso: "MNG" },
+            "South Africa": { profile: "ATU_AFRICA", frName: "Afrique du Sud (ICASA)", enName: "South Africa (ICASA)", iso: "ZAF" },
+            "Morocco": { profile: "ATU_AFRICA", frName: "Maroc (ANRT)", enName: "Morocco (ANRT)", iso: "MAR" },
+            "Egypt": { profile: "ATU_AFRICA", frName: "Égypte (NTRA)", enName: "Egypt (NTRA)", iso: "EGY" },
+            "Nigeria": { profile: "ATU_AFRICA", frName: "Nigéria (NCC)", enName: "Nigeria (NCC)", iso: "NGA" },
+            "Kenya": { profile: "ATU_AFRICA", frName: "Kenya (CA)", enName: "Kenya (CA)", iso: "KEN" },
+            "Algeria": { profile: "ATU_AFRICA", frName: "Algérie (ARPCE)", enName: "Algeria (ARPCE)", iso: "DZA" },
+            "Tunisia": { profile: "ATU_AFRICA", frName: "Tunisie", enName: "Tunisia", iso: "TUN" },
+            "Ethiopia": { profile: "ATU_AFRICA", frName: "Éthiopie", enName: "Ethiopia", iso: "ETH" },
+            "Senegal": { profile: "ATU_AFRICA", frName: "Sénégal", enName: "Senegal", iso: "SEN" },
+            "Côte d'Ivoire": { profile: "ATU_AFRICA", frName: "Côte d'Ivoire", enName: "Ivory Coast", iso: "CIV" },
+            "Ghana": { profile: "ATU_AFRICA", frName: "Ghana", enName: "Ghana", iso: "GHA" },
+            "Tanzania": { profile: "ATU_AFRICA", frName: "Tanzanie", enName: "Tanzania", iso: "TZA" },
+            "Angola": { profile: "ATU_AFRICA", frName: "Angola", enName: "Angola", iso: "AGO" },
+            "Dem. Rep. Congo": { profile: "ATU_AFRICA", frName: "Rép. Dém. du Congo", enName: "Dem. Rep. of Congo", iso: "COD" },
+            "Madagascar": { profile: "ATU_AFRICA", frName: "Madagascar", enName: "Madagascar", iso: "MDG" },
+            "Namibia": { profile: "ATU_AFRICA", frName: "Namibie", enName: "Namibia", iso: "NAM" },
+            "Botswana": { profile: "ATU_AFRICA", frName: "Botswana", enName: "Botswana", iso: "BWA" },
+            "Greenland": { profile: "CEPT_EU", frName: "Groenland (Danemark)", enName: "Greenland (Denmark)", iso: "GRL" }
+        };
+
+        /**
+         * Corridors aériens pour le simulateur de commutation automatique en vol
+         */
+        const FLIGHT_ROUTES = {
+            'CDG-HND': {
+                name: { fr: 'AF274 : Paris (CDG) ➔ Tokyo (HND)', en: 'AF274: Paris (CDG) ➔ Tokyo (HND)' },
+                coords: [[2.55, 49.01], [28.97, 41.01], [69.24, 41.30], [116.40, 39.90], [139.78, 35.55]],
+                steps: [
+                    {
+                        fir: { fr: 'FIR Paris / Eurocontrol (CEPT)', en: 'Paris FIR / Eurocontrol (CEPT)' },
+                        action: {
+                            fr: '5 GHz DFS Ch 52–144 éteints (Règle UE 2029) ➔ Cabine opérée sur 6 GHz U-NII-5 (Ch 33 320 MHz) + 5 GHz U-NII-1',
+                            en: '5 GHz DFS Ch 52–144 disabled (EU 2029 rule) ➔ In-cabin operated on 6 GHz U-NII-5 (Ch 33 320 MHz) + 5 GHz U-NII-1'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'FIR Asie Centrale (RCC)', en: 'Central Asia FIR (RCC)' },
+                        action: {
+                            fr: 'Coupure auto 6 GHz à la frontière FIR ➔ Bascule sur 5 GHz Ch 36–48 & Ch 149–161',
+                            en: 'Auto shutdown of 6 GHz at FIR border ➔ Fallback to 5 GHz Ch 36–48 & Ch 149–161'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        fir: { fr: 'FIR Pékin / CAAC (Chine)', en: 'Beijing FIR / CAAC (China)' },
+                        action: {
+                            fr: 'Application Avis MIIT n° 129 (2021) : Coupure immédiate Ch 100–144 (non alloués) et 6 GHz Haut (IMT) ➔ Maintien U-NII-1 (200 mW) et U-NII-3 (Ch 149–165, 500 mW)',
+                            en: 'MIIT Notice No. 129 compliance: Immediate cutoff of Ch 100–144 (unallocated) & Upper 6 GHz (IMT) ➔ Retain U-NII-1 (200 mW) & U-NII-3 (Ch 149–165, 500 mW)'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        fir: { fr: 'FIR Fukuoka / Tokyo (JCAB)', en: 'Fukuoka / Tokyo FIR (JCAB)' },
+                        action: {
+                            fr: 'Réactivation 6 GHz U-NII-5 (320 MHz) jusqu’au parking porte HND',
+                            en: 'Re-activation of 6 GHz U-NII-5 (320 MHz) down to HND gate parking'
+                        },
+                        status: 'ALLOWED'
+                    }
+                ]
+            },
+            'JFK-LHR': {
+                name: { fr: 'BA112 : New York (JFK) ➔ Londres (LHR)', en: 'BA112: New York (JFK) ➔ London (LHR)' },
+                coords: [[-73.78, 40.64], [-52.71, 47.56], [-30.0, 53.0], [-8.5, 52.5], [-0.45, 51.47]],
+                steps: [
+                    {
+                        fir: { fr: 'FIR New York (FCC)', en: 'New York FIR (FCC)' },
+                        action: {
+                            fr: 'Full 6 GHz (U-NII-5 à U-NII-8) + 5 GHz U-NII-1/3 (2x 320 MHz actifs)',
+                            en: 'Full 6 GHz (U-NII-5 to U-NII-8) + 5 GHz U-NII-1/3 (2x 320 MHz active)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'NAT-OTS (Océan Atlantique Nord)', en: 'NAT-OTS (North Atlantic Ocean)' },
+                        action: {
+                            fr: 'Spectre libre océanique : Capacité maximale Wi-Fi 8 (U-NII-5/7 + 60 GHz IFE)',
+                            en: 'Oceanic airspace: Maximum Wi-Fi 8 throughput (U-NII-5/7 + 60 GHz IFE)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'FIR Shanwick / Londres (Ofcom/CEPT)', en: 'Shanwick / London FIR (Ofcom/CEPT)' },
+                        action: {
+                            fr: 'Entrée espace européen : Coupure obligatoire 5 GHz DFS (Ch 52-144, UE 2029) et U-NII-7 (6G IMT-2030)',
+                            en: 'European FIR Entry: Mandatory cutoff of 5 GHz DFS (Ch 52-144, EU 2029) and U-NII-7 (6G IMT-2030)'
+                        },
+                        status: 'CONDITIONAL'
+                    }
+                ]
+            },
+            'DXB-SYD': {
+                name: { fr: 'EK412 : Dubaï (DXB) ➔ Sydney (SYD)', en: 'EK412: Dubai (DXB) ➔ Sydney (SYD)' },
+                coords: [[55.36, 25.25], [79.86, 6.92], [103.81, 1.35], [130.84, -12.46], [151.17, -33.94]],
+                steps: [
+                    {
+                        fir: { fr: 'FIR Émirats (GCAA)', en: 'Emirates FIR (GCAA)' },
+                        action: {
+                            fr: 'Activation Gate-to-Gate 6 GHz U-NII-5 + AFC U-NII-7',
+                            en: 'Gate-to-Gate 6 GHz U-NII-5 + AFC U-NII-7 enabled'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'Océan Indien & FIR Singapour (APT)', en: 'Indian Ocean & Singapore FIR (APT)' },
+                        action: {
+                            fr: 'Continuité totale sur 6 GHz Bas (Ch 33 & Ch 65 en 320 MHz)',
+                            en: 'Full seamless handover on 6 GHz Low (Ch 33 & Ch 65 at 320 MHz)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'FIR Melbourne / Sydney (ACMA)', en: 'Melbourne / Sydney FIR (ACMA)' },
+                        action: {
+                            fr: 'Maintien U-NII-5 et U-NII-3 jusqu’à l’arrivée au bloc à Sydney',
+                            en: 'Retain U-NII-5 and U-NII-3 down to gate arrival in Sydney'
+                        },
+                        status: 'ALLOWED'
+                    }
+                ]
+            },
+            'GRU-MAD': {
+                name: { fr: 'IB6824 : São Paulo (GRU) ➔ Madrid (MAD)', en: 'IB6824: São Paulo (GRU) ➔ Madrid (MAD)' },
+                coords: [[-46.47, -23.43], [-35.20, -5.79], [-17.44, 14.69], [-15.4, 28.0], [-3.56, 40.47]],
+                steps: [
+                    {
+                        fir: { fr: 'FIR Curitiba / Recife (ANATEL)', en: 'Curitiba / Recife FIR (ANATEL)' },
+                        action: {
+                            fr: 'Spectre complet 6 GHz (5925–7125 MHz) autorisé dès l’embarquement',
+                            en: 'Full 6 GHz spectrum (5925–7125 MHz) authorized from boarding'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'FIR Dakar / Atlantique Sud (ATU)', en: 'Dakar FIR / South Atlantic (ATU)' },
+                        action: {
+                            fr: 'Bascule automatique sur U-NII-5 uniquement (6425–7125 MHz coupé)',
+                            en: 'Automated fallback to U-NII-5 only (6425–7125 MHz muted)'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        fir: { fr: 'FIR Madrid (EASA / CEPT)', en: 'Madrid FIR (EASA / CEPT)' },
+                        action: {
+                            fr: 'Maintien U-NII-5 (5945–6425 MHz) jusqu’au débarquement à Barajas',
+                            en: 'U-NII-5 (5945–6425 MHz) maintained until Barajas disembarkation'
+                        },
+                        status: 'ALLOWED'
+                    }
+                ]
+            },
+            'LAX-SIN': {
+                name: { fr: 'SQ37 : Los Angeles (LAX) ➔ Singapour (SIN)', en: 'SQ37: Los Angeles (LAX) ➔ Singapore (SIN)' },
+                coords: [[-118.40, 33.94], [-157.85, 21.30], [144.79, 13.44], [121.0, 14.5], [103.99, 1.36]],
+                steps: [
+                    {
+                        fir: { fr: 'FIR Los Angeles & Oakland (FCC)', en: 'Los Angeles & Oakland FIR (FCC)' },
+                        action: {
+                            fr: 'Spectre maximal 2.4 / 5 / 6 GHz complet (1200 MHz en 6 GHz)',
+                            en: 'Maximum 2.4 / 5 / 6 GHz complete spectrum (1200 MHz on 6 GHz)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'Pacifique Sud & FIR Manille (APT)', en: 'South Pacific & Manila FIR (APT)' },
+                        action: {
+                            fr: 'Transition transparente vers profil APT (U-NII-5 + U-NII-3)',
+                            en: 'Seamless transition to APT profile (U-NII-5 + U-NII-3)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        fir: { fr: 'FIR Singapour (IMDA)', en: 'Singapore FIR (IMDA)' },
+                        action: {
+                            fr: 'Approche Changi : U-NII-5 (320 MHz) + U-NII-1/3 maintenus Gate-to-Gate',
+                            en: 'Changi Approach: U-NII-5 (320 MHz) + U-NII-1/3 maintained Gate-to-Gate'
+                        },
+                        status: 'ALLOWED'
+                    }
+                ]
+            }
+        };
+
+        /***********************************************************************
+         * 2. ÉTAT GLOBAL DE L'INTERFACE
+         ***********************************************************************/
+        let currentState = {
+            lang: 'fr',                   // 'fr' ou 'en'
+            flightPhase: 'cruise',        // 'cruise' ou 'ground'
+            selectedBand: 'ALL',          // 'ALL', '2.4G', 'UNII-1', etc.
+            selectedChannel: null,        // { bandId, ch, label }
+            selectedCountryName: 'France',
+            activeRoute: 'none',
+            highlightedBw: 20
+        };
+
+        let svgMap, gMap, projection, pathGenerator, zoomBehavior;
+        let worldCountriesFeatures = [];
+
+        /***********************************************************************
+         * 3. GESTION DE LA LANGUE (FR / EN)
+         ***********************************************************************/
+        function setLanguage(lang) {
+            currentState.lang = lang;
+            const t = TRANSLATIONS[lang];
+
+            // 1. Boutons de langue
+            const btnFr = document.getElementById('lang-btn-fr');
+            const btnEn = document.getElementById('lang-btn-en');
+            if (lang === 'fr') {
+                btnFr.className = 'px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+                btnEn.className = 'px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all text-slate-400 hover:text-slate-200';
+            } else {
+                btnEn.className = 'px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+                btnFr.className = 'px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all text-slate-400 hover:text-slate-200';
+            }
+
+            // 2. Textes statiques
+            document.title = t.docTitle;
+            document.getElementById('ui-header-subtitle').textContent = t.headerSubtitle;
+            document.getElementById('ui-wrc-tag').textContent = t.uitTag;
+            document.getElementById('ui-btn-cruise').textContent = t.btnCruise;
+            document.getElementById('ui-btn-ground').textContent = t.btnGround;
+            document.getElementById('ui-corridor-label').textContent = t.corridorLabel;
+
+            // Bannière UE 2029
+            document.getElementById('ui-eu-banner-title').textContent = t.euBannerTitle;
+            document.getElementById('ui-eu-banner-text').textContent = t.euBannerText;
+            document.getElementById('ui-eu-banner-badge').textContent = t.euBannerBadge;
+
+            // Filtres & Boutons de bandes
+            document.getElementById('ui-filter-title').textContent = t.filterTitle;
+            document.getElementById('ui-btn-reset').textContent = t.btnReset;
+            document.getElementById('btn-band-all-title').textContent = t.bandAllTitle;
+            document.getElementById('btn-band-all-sub').textContent = t.bandAllSub;
+            document.getElementById('btn-band-24-title').textContent = t.band24Title;
+            document.getElementById('btn-band-unii1-sub').textContent = t.bandUnii1Sub;
+            document.getElementById('btn-band-unii1-note').textContent = t.bandUnii1Note;
+            document.getElementById('btn-band-unii2-note').textContent = t.bandUnii2Note;
+            document.getElementById('btn-band-unii3-sub').textContent = t.bandUnii3Sub;
+            document.getElementById('btn-band-unii5-sub').textContent = t.bandUnii5Sub;
+            document.getElementById('btn-band-unii7-sub').textContent = t.bandUnii7Sub;
+            document.getElementById('btn-band-60g-sub').textContent = t.band60gSub;
+
+            // Barre de recherche et Légende
+            document.getElementById('country-search').placeholder = t.searchPlaceholder;
+            document.getElementById('ui-leg-allowed').textContent = t.legAllowed;
+            document.getElementById('ui-leg-conditional').textContent = t.legConditional;
+            document.getElementById('ui-leg-forbidden').textContent = t.legForbidden;
+            document.getElementById('ui-leg-hint').textContent = t.legHint;
+
+            // Analyseur spectral
+            document.getElementById('ui-analyzer-title').innerHTML = `<i class="fa-solid fa-wave-square"></i> ${t.analyzerTitle}`;
+            document.getElementById('ui-analyzer-subtitle').textContent = t.analyzerSubtitle;
+            document.getElementById('ui-width-label').textContent = t.widthLabel;
+
+            // Inspecteur
+            document.getElementById('ui-insp-score-label').textContent = t.inspScoreLabel;
+            document.getElementById('ui-insp-maxbw-title').textContent = t.inspMaxBwTitle;
+            document.getElementById('ui-insp-hullloss-title').textContent = t.inspHullLossTitle;
+            document.getElementById('ui-insp-afc-title').textContent = t.inspAfcTitle;
+            document.getElementById('ui-insp-bands-title').textContent = t.inspBandsTitle;
+            document.getElementById('ui-insp-directive-title').textContent = t.inspDirectiveTitle;
+
+            // Plan de commutation et Pied de page
+            document.getElementById('ui-handover-title').innerHTML = `<i class="fa-solid fa-satellite-dish"></i> ${t.handoverTitle}`;
+            document.getElementById('ui-handover-subtitle').textContent = t.handoverSubtitle;
+            document.getElementById('ui-footer-text').textContent = t.footerText;
+            document.getElementById('ui-footer-standard').textContent = t.footerStandard;
+
+            // 3. Re-génération des listes dynamiques (Sélecteur de route, badge de filtre, analyseur, inspecteur)
+            populateRouteSelectorOptions();
+            updateActiveFilterBadge();
+            updateInspectorPanel(currentState.selectedCountryName);
+            renderHandoverTimeline();
+            updateMapColors();
+        }
+
+        function populateRouteSelectorOptions() {
+            const selector = document.getElementById('route-selector');
+            const curVal = selector.value || currentState.activeRoute || 'none';
+            const t = TRANSLATIONS[currentState.lang];
+
+            let html = `<option value="none" class="bg-slate-900">${t.noActiveRoute}</option>`;
+            Object.entries(FLIGHT_ROUTES).forEach(([key, route]) => {
+                const label = route.name[currentState.lang] || route.name.fr;
+                html += `<option value="${key}" class="bg-slate-900" ${curVal === key ? 'selected' : ''}>${label}</option>`;
+            });
+            selector.innerHTML = html;
+        }
+
+        function updateActiveFilterBadge() {
+            const t = TRANSLATIONS[currentState.lang];
+            const badge = document.getElementById('active-filter-badge');
+
+            if (currentState.selectedChannel) {
+                badge.textContent = `${t.filterActiveChannel}${currentState.selectedChannel.label}`;
+            } else if (currentState.selectedBand !== 'ALL') {
+                const bandObj = BANDS_CATALOG.find(b => b.id === currentState.selectedBand);
+                const bandName = bandObj ? (bandObj.name[currentState.lang] || bandObj.name.fr) : currentState.selectedBand;
+                badge.textContent = `${t.filterActiveBand}${bandName}`;
+            } else {
+                badge.textContent = t.filterActiveDefault;
+            }
+        }
+
+        /***********************************************************************
+         * 4. FONCTIONS DE RÉSOLUTION DES PROFILS PAYS
+         ***********************************************************************/
+        function getCountryInfo(countryName, centroid = [0, 0]) {
+            const isEn = currentState.lang === 'en';
+            if (COUNTRY_TO_PROFILE[countryName]) {
+                const entry = COUNTRY_TO_PROFILE[countryName];
+                return {
+                    displayName: isEn ? entry.enName : entry.frName,
+                    iso: entry.iso,
+                    profileKey: entry.profile,
+                    profile: REGULATORY_PROFILES[entry.profile]
+                };
+            }
+            // Attribution géographique intelligente par défaut selon le centroïde [lon, lat]
+            const [lon, lat] = centroid;
+            let profileKey = 'CEPT_EU';
+            if (lon < -30) {
+                profileKey = lat > 15 ? 'FCC_NA' : 'CITEL_LATAM';
+            } else if (lon >= -30 && lon <= 55 && lat < 35) {
+                profileKey = (lon > 33 && lat > 12) ? 'GCAA_MEA' : 'ATU_AFRICA';
+            } else if (lon > 55 && lat > 42) {
+                profileKey = 'RCC_EURASIA';
+            } else if (lon > 55 && lat <= 42) {
+                profileKey = 'APT_APAC';
+            }
+            return {
+                displayName: countryName,
+                iso: countryName.slice(0, 3).toUpperCase(),
+                profileKey,
+                profile: REGULATORY_PROFILES[profileKey]
+            };
+        }
+
+        /**
+         * Détermine le statut d'autorisation d'un pays selon le filtre actif
+         */
+        function evaluateCountryStatus(countryName, centroid) {
+            const info = getCountryInfo(countryName, centroid);
+            const prof = info.profile;
+            const phase = currentState.flightPhase;
+            const isEn = currentState.lang === 'en';
+
+            // Si un canal spécifique est sélectionné
+            if (currentState.selectedChannel) {
+                const bandId = currentState.selectedChannel.bandId;
+                const chId = currentState.selectedChannel.ch;
+
+                // Application stricte Décision (UE) 2022/179
+                if (bandId === 'UNII-2' && info.profileKey === 'CEPT_EU') {
+                    return {
+                        status: 'FORBIDDEN',
+                        label: isEn ? "Banned in EU aircraft since 01/01/2029 (EU Decision 2022/179)" : "Interdit à bord en UE depuis le 01/01/2029 (Décision UE 2022/179)"
+                    };
+                }
+
+                // Application Avis MIIT n° 129 [2021] pour la Chine
+                if (info.profileKey === 'CAAC_CN' && bandId === 'UNII-2') {
+                    if (typeof chId === 'number' && chId >= 100 && chId <= 144) {
+                        return {
+                            status: 'FORBIDDEN',
+                            label: isEn ? "Unallocated to WLAN in China (MIIT Notice No. 129 [2021])" : "Non alloué au WLAN en Chine (Avis MIIT n° 129 [2021])"
+                        };
+                    }
+                    if (phase === 'ground') {
+                        return {
+                            status: 'FORBIDDEN',
+                            label: isEn ? "Ch 52–64 prohibited on ground in China (MIIT 129 / CAAC)" : "Ch 52–64 interdits au sol en Chine (Avis MIIT 129 / CAAC)"
+                        };
+                    }
+                    return {
+                        status: 'CONDITIONAL',
+                        label: isEn ? "Ch 52–64 allowed in flight with non-disableable DFS (MIIT 129)" : "Ch 52–64 autorisé en vol avec DFS obligatoire non débrayable (MIIT 129)"
+                    };
+                }
+
+                // Canal 13 en 2.4 GHz
+                if (bandId === '2.4G' && chId === 13 && info.profileKey === 'FCC_NA') {
+                    return {
+                        status: 'CONDITIONAL',
+                        label: isEn ? 'Ch 13 restricted Low Power (FCC)' : 'Ch 13 restreint Basse Puissance (FCC)'
+                    };
+                }
+
+                // Canal 124 TDWR météo
+                if (bandId === 'UNII-2' && chId === 124) {
+                    if (phase === 'ground' || info.profileKey === 'CAAC_CN' || info.profileKey === 'RCC_EURASIA') {
+                        return {
+                            status: 'FORBIDDEN',
+                            label: isEn ? 'Protected TDWR Weather Radar (5600-5650 MHz)' : 'Protégé Radar Météo TDWR (5600-5650 MHz)'
+                        };
+                    }
+                    return {
+                        status: 'CONDITIONAL',
+                        label: isEn ? 'Allowed >FL100 with DFS active' : 'Autorisé >FL100 avec DFS actif'
+                    };
+                }
+
+                const bandRule = prof.bands[bandId];
+                const detailText = bandRule.detail[currentState.lang] || bandRule.detail.fr;
+                return {
+                    status: bandRule[phase],
+                    label: `${bandRule.eirp} • ${detailText}`
+                };
+            }
+
+            // Si une bande spécifique est sélectionnée
+            if (currentState.selectedBand !== 'ALL') {
+                const bandRule = prof.bands[currentState.selectedBand];
+                const detailText = bandRule.detail[currentState.lang] || bandRule.detail.fr;
+                return {
+                    status: bandRule[phase],
+                    label: `${bandRule.eirp} • ${detailText}`
+                };
+            }
+
+            // Vue globale
+            const u5 = prof.bands['UNII-5'][phase];
+            const u7 = prof.bands['UNII-7'][phase];
+            if (u5 === 'ALLOWED' && (u7 === 'ALLOWED' || u7 === 'CONDITIONAL')) {
+                return {
+                    status: 'ALLOWED',
+                    label: isEn ? `Score ${prof.score}% • 2.4G / 5G / 6G (${prof.maxBw})` : `Indice ${prof.score}% • 2.4G / 5G / 6G (${prof.maxBw})`
+                };
+            } else if (u5 === 'ALLOWED' || u5 === 'CONDITIONAL') {
+                return {
+                    status: 'CONDITIONAL',
+                    label: isEn ? `Score ${prof.score}% • Partial or conditional 6 GHz` : `Indice ${prof.score}% • 6 GHz partiel ou conditionnel`
+                };
+            }
+            return {
+                status: 'FORBIDDEN',
+                label: isEn ? `Score ${prof.score}% • 6 GHz restricted on ground` : `Indice ${prof.score}% • 6 GHz restreint au sol`
+            };
+        }
+
+        function getStatusColor(status) {
+            switch (status) {
+                case 'ALLOWED': return '#10b981';
+                case 'CONDITIONAL': return '#f59e0b';
+                case 'FORBIDDEN': return '#e11d48';
+                default: return '#1e293b';
+            }
+        }
+
+        /***********************************************************************
+         * 5. INITIALISATION DE LA CARTE MONDIALE D3.JS
+         ***********************************************************************/
+        async function initWorldMap() {
+            const container = document.getElementById('map-container');
+            const width = container.clientWidth || 900;
+            const height = 450;
+
+            svgMap = d3.select('#world-map-svg')
+                .attr('viewBox', `0 0 ${width} ${height}`);
+
+            const defs = svgMap.append('defs');
+            const glowFilter = defs.append('filter').attr('id', 'glow');
+            glowFilter.append('feGaussianBlur').attr('stdDeviation', '2.5').attr('result', 'coloredBlur');
+            const feMerge = glowFilter.append('feMerge');
+            feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+            feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+            gMap = svgMap.append('g');
+
+            projection = d3.geoNaturalEarth1()
+                .scale(width / 5.6)
+                .translate([width / 2, height / 1.88]);
+
+            pathGenerator = d3.geoPath().projection(projection);
+
+            const graticule = d3.geoGraticule();
+            gMap.append('path')
+                .datum(graticule())
+                .attr('class', 'graticule')
+                .attr('d', pathGenerator)
+                .attr('fill', 'none')
+                .attr('stroke', 'rgba(56, 189, 248, 0.08)')
+                .attr('stroke-width', 0.6);
+
+            zoomBehavior = d3.zoom()
+                .scaleExtent([1, 7])
+                .on('zoom', (event) => {
+                    gMap.attr('transform', event.transform);
+                });
+
+            svgMap.call(zoomBehavior);
+
+            try {
+                const response = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+                const worldData = await response.json();
+                worldCountriesFeatures = topojson.feature(worldData, worldData.objects.countries).features
+                    .filter(d => d.properties.name !== 'Antarctica');
+
+                renderCountries();
+                renderFlightRouteOverlay();
+                updateInspectorPanel('France');
+            } catch (err) {
+                console.error("Erreur de chargement TopoJSON :", err);
+            }
+        }
+
+        function renderCountries() {
+            const tooltip = document.getElementById('map-tooltip');
+
+            gMap.selectAll('.country-path')
+                .data(worldCountriesFeatures)
+                .join('path')
+                .attr('class', d => `country-path ${d.properties.name === currentState.selectedCountryName ? 'country-selected' : ''}`)
+                .attr('d', pathGenerator)
+                .attr('stroke', '#091124')
+                .attr('stroke-width', 0.6)
+                .attr('fill', d => {
+                    const centroid = d3.geoCentroid(d);
+                    const res = evaluateCountryStatus(d.properties.name, centroid);
+                    return getStatusColor(res.status);
+                })
+                .attr('fill-opacity', d => d.properties.name === currentState.selectedCountryName ? 0.95 : 0.72)
+                .on('mousemove', function(event, d) {
+                    const centroid = d3.geoCentroid(d);
+                    const info = getCountryInfo(d.properties.name, centroid);
+                    const evalRes = evaluateCountryStatus(d.properties.name, centroid);
+                    const t = TRANSLATIONS[currentState.lang];
+
+                    document.getElementById('tt-country').textContent = info.displayName;
+                    document.getElementById('tt-reg').textContent = info.profileKey.replace('_', ' ');
+
+                    const statusBadge = evalRes.status === 'ALLOWED'
+                        ? `<span class="text-emerald-400">${t.ttStatusAllowed}</span>`
+                        : evalRes.status === 'CONDITIONAL'
+                            ? `<span class="text-amber-400">${t.ttStatusConditional}</span>`
+                            : `<span class="text-rose-400">${t.ttStatusForbidden}</span>`;
+
+                    document.getElementById('tt-status').innerHTML = statusBadge;
+                    document.getElementById('tt-details').textContent = evalRes.label;
+
+                    const [mx, my] = d3.pointer(event, document.getElementById('map-container'));
+                    tooltip.style.left = `${Math.min(mx + 16, document.getElementById('map-container').clientWidth - 230)}px`;
+                    tooltip.style.top = `${Math.max(my - 75, 12)}px`;
+                    tooltip.classList.remove('hidden');
+                })
+                .on('mouseleave', function() {
+                    tooltip.classList.add('hidden');
+                })
+                .on('click', function(event, d) {
+                    event.stopPropagation();
+                    selectCountryOnMap(d.properties.name);
+                });
+        }
+
+        function updateMapColors() {
+            if (!gMap) return;
+            gMap.selectAll('.country-path')
+                .attr('class', d => `country-path ${d.properties.name === currentState.selectedCountryName ? 'country-selected' : ''}`)
+                .attr('fill', d => {
+                    const centroid = d3.geoCentroid(d);
+                    const res = evaluateCountryStatus(d.properties.name, centroid);
+                    return getStatusColor(res.status);
+                })
+                .attr('fill-opacity', d => d.properties.name === currentState.selectedCountryName ? 0.95 : 0.72);
+        }
+
+        function selectCountryOnMap(countryName) {
+            currentState.selectedCountryName = countryName;
+            updateMapColors();
+            updateInspectorPanel(countryName);
+        }
+
+        function zoomMap(factor) {
+            if (!svgMap || !zoomBehavior) return;
+            svgMap.transition().duration(300).call(zoomBehavior.scaleBy, factor);
+        }
+
+        function resetMapZoom() {
+            if (!svgMap || !zoomBehavior) return;
+            svgMap.transition().duration(400).call(zoomBehavior.transform, d3.zoomIdentity);
+        }
+
+        /***********************************************************************
+         * 6. ANALYSEUR SPECTRAL & SÉLECTION DE CANAUX WI-FI
+         ***********************************************************************/
+        function renderSpectrumVisualizer() {
+            const container = document.getElementById('spectrum-visualizer');
+            const feature = worldCountriesFeatures.find(f => f.properties.name === currentState.selectedCountryName);
+            const centroid = feature ? d3.geoCentroid(feature) : [2, 46];
+            const countryInfo = getCountryInfo(currentState.selectedCountryName, centroid);
+            const prof = countryInfo.profile;
+            const phase = currentState.flightPhase;
+            const t = TRANSLATIONS[currentState.lang];
+
+            let html = '';
+
+            BANDS_CATALOG.forEach(band => {
+                const bandRule = prof.bands[band.id];
+                const bandStatus = bandRule[phase];
+                const isBandSelected = currentState.selectedBand === band.id;
+                const bandTitle = band.name[currentState.lang] || band.name.fr;
+
+                const statusDot = bandStatus === 'ALLOWED'
+                    ? 'bg-emerald-400'
+                    : bandStatus === 'CONDITIONAL' ? 'bg-amber-400' : 'bg-rose-500';
+
+                html += `
+                <div class="bg-slate-950/80 border ${isBandSelected ? 'border-cyan-400/70' : 'border-slate-800/80'} rounded-xl p-2.5 transition-all">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full ${statusDot}"></span>
+                            <button onclick="setBandFilter('${band.id}')" class="text-xs font-bold text-white hover:text-cyan-300 transition-colors">
+                                ${bandTitle}
+                            </button>
+                            <span class="text-[11px] font-mono text-slate-400">${band.range}</span>
+                        </div>
+                        <div class="text-[11px] font-mono text-slate-400">
+                            <span class="text-slate-300">${countryInfo.displayName} :</span> ${bandRule.eirp}
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5">
+                        ${band.channels.map(c => {
+                            let chStatus = bandStatus;
+                            if (band.id === 'UNII-2' && countryInfo.profileKey === 'CEPT_EU') {
+                                chStatus = 'FORBIDDEN';
+                            }
+                            if (band.id === 'UNII-2' && countryInfo.profileKey === 'CAAC_CN') {
+                                if (typeof c.ch === 'number' && c.ch >= 100) {
+                                    chStatus = 'FORBIDDEN';
+                                } else if (phase === 'ground') {
+                                    chStatus = 'FORBIDDEN';
+                                }
+                            }
+                            if (band.id === '2.4G' && c.ch === 13 && countryInfo.profileKey === 'FCC_NA') {
+                                chStatus = 'CONDITIONAL';
+                            }
+                            if (band.id === 'UNII-2' && c.tdwr && (phase === 'ground' || countryInfo.profileKey === 'CAAC_CN' || countryInfo.profileKey === 'RCC_EURASIA')) {
+                                chStatus = 'FORBIDDEN';
+                            }
+
+                            const isSelectedCh = currentState.selectedChannel && currentState.selectedChannel.ch === c.ch && currentState.selectedChannel.bandId === band.id;
+                            const bwHighlight = c.bw >= currentState.highlightedBw ? 'opacity-100' : 'opacity-50';
+
+                            const colorClasses = chStatus === 'ALLOWED'
+                                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                                : chStatus === 'CONDITIONAL'
+                                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                                    : 'bg-rose-500/15 border-rose-500/40 text-rose-300 hover:bg-rose-500/25';
+
+                            const displayLabel = c.label ? c.label : `Ch ${c.ch}`;
+                            const isEuBanned = (band.id === 'UNII-2' && countryInfo.profileKey === 'CEPT_EU');
+                            const isMiitExcluded = (band.id === 'UNII-2' && countryInfo.profileKey === 'CAAC_CN' && typeof c.ch === 'number' && c.ch >= 100);
+
+                            let badgeLabel = c.bw >= 1000 ? '2.1G' : c.bw + 'M';
+                            if (isEuBanned) badgeLabel = currentState.lang === 'en' ? 'EU-BAN' : 'BAN-UE';
+                            else if (isMiitExcluded) badgeLabel = 'NON-MIIT';
+
+                            return `
+                                <button onclick="selectSpecificChannel('${band.id}', '${c.ch}', '${displayLabel} (${c.freq} MHz)')"
+                                    class="channel-pill ${isSelectedCh ? 'active-filter ring-2 ring-cyan-400' : ''} ${bwHighlight} ${colorClasses} border rounded-lg px-2 py-1.5 text-left flex flex-col justify-between">
+                                    <div class="flex items-center justify-between w-full">
+                                        <span class="font-mono text-xs font-bold ${(isEuBanned || isMiitExcluded) ? 'line-through text-rose-400' : ''}">${displayLabel}</span>
+                                        <span class="text-[9px] font-mono px-1 rounded bg-slate-950/60">${badgeLabel}</span>
+                                    </div>
+                                    <div class="text-[10px] font-mono opacity-80 mt-0.5">${c.freq} MHz</div>
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        /***********************************************************************
+         * 7. MISE À JOUR DU PANNEAU INSPECTEUR DROIT
+         ***********************************************************************/
+        function updateInspectorPanel(countryName) {
+            const feature = worldCountriesFeatures.find(f => f.properties.name === countryName);
+            const centroid = feature ? d3.geoCentroid(feature) : [2, 46];
+            const info = getCountryInfo(countryName, centroid);
+            const prof = info.profile;
+            const phase = currentState.flightPhase;
+            const t = TRANSLATIONS[currentState.lang];
+
+            document.getElementById('inspector-region-tag').textContent = prof.regionTag;
+            document.getElementById('inspector-iso').textContent = info.iso;
+            document.getElementById('inspector-country-name').textContent = info.displayName;
+            document.getElementById('inspector-authority').textContent = `${currentState.lang === 'en' ? 'Authority' : 'Autorité'} : ${prof.authority}`;
+            document.getElementById('inspector-score').textContent = `${prof.score}%`;
+            document.getElementById('inspector-max-bw').textContent = prof.maxBw;
+            document.getElementById('inspector-hull-loss').textContent = prof.hullLoss;
+            document.getElementById('inspector-afc').textContent = typeof prof.afc === 'object' ? (prof.afc[currentState.lang] || prof.afc.fr) : prof.afc;
+            document.getElementById('inspector-notes').textContent = typeof prof.notes === 'object' ? (prof.notes[currentState.lang] || prof.notes.fr) : prof.notes;
+            document.getElementById('inspector-phase-label').textContent = phase === 'cruise' ? t.modeCruise : t.modeGround;
+
+            const bandsListEl = document.getElementById('inspector-bands-list');
+            bandsListEl.innerHTML = BANDS_CATALOG.map(band => {
+                const rule = prof.bands[band.id];
+                const status = rule[phase];
+                const bandTitle = band.name[currentState.lang] || band.name.fr;
+                const detailText = rule.detail[currentState.lang] || rule.detail.fr;
+
+                const badge = status === 'ALLOWED'
+                    ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">${t.badgeAllowed}</span>`
+                    : status === 'CONDITIONAL'
+                        ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">${t.badgeConditional}</span>`
+                        : `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">${t.badgeForbidden}</span>`;
+
+                return `
+                    <div onclick="setBandFilter('${band.id}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-3 transition-all">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="font-semibold text-xs text-white">${bandTitle}</div>
+                            ${badge}
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-cyan-400 mt-1">
+                            <span>${band.range}</span>
+                            <span>${t.eirpLabel} ${rule.eirp}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">${detailText}</p>
+                    </div>
+                `;
+            }).join('');
+
+            renderSpectrumVisualizer();
+        }
+
+        /***********************************************************************
+         * 8. GESTION DES FILTRES & INTERACTIONS
+         ***********************************************************************/
+        function setBandFilter(bandId) {
+            currentState.selectedBand = bandId;
+            currentState.selectedChannel = null;
+
+            document.querySelectorAll('.band-btn').forEach(btn => {
+                if (btn.dataset.band === bandId) {
+                    btn.classList.add('bg-cyan-500/20', 'border-cyan-400', 'text-white');
+                    btn.classList.remove('bg-slate-900/70', 'border-slate-800');
+                } else {
+                    btn.classList.remove('bg-cyan-500/20', 'border-cyan-400', 'text-white');
+                    btn.classList.add('bg-slate-900/70', 'border-slate-800');
+                }
+            });
+
+            updateActiveFilterBadge();
+            updateMapColors();
+            renderSpectrumVisualizer();
+        }
+
+        function selectSpecificChannel(bandId, chId, label) {
+            const parsedCh = isNaN(Number(chId)) ? chId : Number(chId);
+            currentState.selectedBand = bandId;
+            currentState.selectedChannel = { bandId, ch: parsedCh, label };
+
+            updateActiveFilterBadge();
+            updateMapColors();
+            renderSpectrumVisualizer();
+        }
+
+        function resetChannelFilter() {
+            setBandFilter('ALL');
+        }
+
+        function setFlightPhase(phase) {
+            currentState.flightPhase = phase;
+            const btnCruise = document.getElementById('phase-cruise');
+            const btnGround = document.getElementById('phase-ground');
+
+            if (phase === 'cruise') {
+                btnCruise.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+                btnGround.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-slate-200';
+            } else {
+                btnGround.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+                btnCruise.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-slate-200';
+            }
+
+            updateMapColors();
+            updateInspectorPanel(currentState.selectedCountryName);
+        }
+
+        function highlightChannelWidth(bw) {
+            currentState.highlightedBw = bw;
+            document.querySelectorAll('.ch-width-btn').forEach(btn => {
+                if (btn.textContent.startsWith(String(bw))) {
+                    btn.classList.add('bg-slate-800', 'text-cyan-300');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-slate-800', 'text-cyan-300');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+            renderSpectrumVisualizer();
+        }
+
+        /***********************************************************************
+         * 9. SIMULATEUR DE CORRIDOR AÉRIEN
+         ***********************************************************************/
+        function selectFlightRoute(routeKey) {
+            currentState.activeRoute = routeKey;
+            renderFlightRouteOverlay();
+            renderHandoverTimeline();
+        }
+
+        function renderFlightRouteOverlay() {
+            if (!gMap) return;
+            gMap.selectAll('.route-layer').remove();
+
+            if (currentState.activeRoute === 'none' || !FLIGHT_ROUTES[currentState.activeRoute]) return;
+
+            const route = FLIGHT_ROUTES[currentState.activeRoute];
+            const routeGroup = gMap.append('g').attr('class', 'route-layer');
+
+            const lineGeoJson = {
+                type: 'LineString',
+                coordinates: route.coords
+            };
+
+            routeGroup.append('path')
+                .datum(lineGeoJson)
+                .attr('d', pathGenerator)
+                .attr('fill', 'none')
+                .attr('stroke', '#00f0ff')
+                .attr('stroke-width', 4)
+                .attr('stroke-opacity', 0.25);
+
+            routeGroup.append('path')
+                .datum(lineGeoJson)
+                .attr('class', 'flight-route-arc')
+                .attr('d', pathGenerator)
+                .attr('fill', 'none')
+                .attr('stroke', '#00f0ff')
+                .attr('stroke-width', 2);
+
+            routeGroup.selectAll('.waypoint-dot')
+                .data(route.coords)
+                .join('circle')
+                .attr('class', 'waypoint-dot')
+                .attr('cx', d => projection(d)[0])
+                .attr('cy', d => projection(d)[1])
+                .attr('r', 4)
+                .attr('fill', '#040814')
+                .attr('stroke', '#00f0ff')
+                .attr('stroke-width', 2);
+        }
+
+        function renderHandoverTimeline() {
+            const container = document.getElementById('flight-handover-timeline');
+            const routeKey = currentState.activeRoute === 'none' ? 'CDG-HND' : currentState.activeRoute;
+            const route = FLIGHT_ROUTES[routeKey];
+            const isCustom = currentState.activeRoute !== 'none';
+
+            container.innerHTML = route.steps.map((s, idx) => {
+                const dotColor = s.status === 'ALLOWED' ? 'bg-emerald-400' : 'bg-amber-400';
+                const firText = s.fir[currentState.lang] || s.fir.fr;
+                const actionText = s.action[currentState.lang] || s.action.fr;
+
+                return `
+                    <div class="bg-slate-950/80 border ${isCustom ? 'border-cyan-500/30' : 'border-slate-800/80'} rounded-xl p-2.5 flex items-start gap-2.5">
+                        <div class="w-5 h-5 rounded-full ${isCustom ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-300' : 'bg-slate-900 border border-slate-700 text-cyan-400'} flex items-center justify-center text-[10px] font-mono shrink-0 mt-0.5">
+                            ${idx + 1}
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full ${dotColor}"></span>
+                                <span class="font-semibold text-white text-xs">${firText}</span>
+                            </div>
+                            <p class="text-[11px] ${isCustom ? 'text-slate-300' : 'text-slate-400'} mt-0.5 font-mono">${actionText}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /***********************************************************************
+         * 10. RECHERCHE RAPIDE DE PAYS
+         ***********************************************************************/
+        function handleCountrySearch(query) {
+            const dropdown = document.getElementById('search-dropdown');
+            const cleanQuery = query.trim().toLowerCase();
+
+            if (!cleanQuery) {
+                dropdown.classList.add('hidden');
+                return;
+            }
+
+            const isEn = currentState.lang === 'en';
+            const matches = Object.entries(COUNTRY_TO_PROFILE)
+                .filter(([enKey, data]) =>
+                    enKey.toLowerCase().includes(cleanQuery) ||
+                    data.frName.toLowerCase().includes(cleanQuery) ||
+                    data.enName.toLowerCase().includes(cleanQuery) ||
+                    data.iso.toLowerCase().includes(cleanQuery)
+                )
+                .slice(0, 8);
+
+            if (matches.length === 0) {
+                dropdown.classList.add('hidden');
+                return;
+            }
+
+            dropdown.innerHTML = matches.map(([enKey, data]) => {
+                const label = isEn ? data.enName : data.frName;
+                return `
+                    <button onclick="pickCountryFromSearch('${enKey.replace(/'/g, "\\'")}')"
+                        class="w-full px-3 py-2 text-left text-xs hover:bg-slate-900 flex items-center justify-between transition-colors">
+                        <span class="text-slate-200 font-medium">${label}</span>
+                        <span class="text-[10px] font-mono text-cyan-400">${data.iso}</span>
+                    </button>
+                `;
+            }).join('');
+
+            dropdown.classList.remove('hidden');
+        }
+
+        function pickCountryFromSearch(enName) {
+            document.getElementById('search-dropdown').classList.add('hidden');
+            const data = COUNTRY_TO_PROFILE[enName];
+            const isEn = currentState.lang === 'en';
+            document.getElementById('country-search').value = data ? (isEn ? data.enName : data.frName) : enName;
+            selectCountryOnMap(enName);
+        }
+
+        // Initialisation de l'application
+        window.onload = function() {
+            setLanguage('fr');
+            initWorldMap();
+        };
+    </script>
+</body>
+</html>
