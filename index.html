@@ -203,11 +203,6 @@
                         </h2>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <!-- Commutateur de désactivation totale ISM (Saturation Bluetooth Cabine) -->
-                        <button id="bt-ism-toggle" onclick="toggleIsmBluetoothMute()" class="text-xs font-mono px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30" title="Désactiver les bandes ISM communes au Bluetooth (saturées par les périphériques passagers)">
-                            <i class="fa-brands fa-bluetooth-b text-cyan-400"></i>
-                            <span id="ui-bt-ism-label">Coupure ISM (Saturation BT) : ON</span>
-                        </button>
                         <span id="active-filter-badge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                             Filtre actif : Toutes bandes sauf ISM (BT)
                         </span>
@@ -227,7 +222,7 @@
                     <button onclick="setBandFilter('2.4G')" data-band="2.4G" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
                         <div class="text-[10px] font-mono text-emerald-400">2.4 GHz</div>
                         <div id="btn-band-24-title" class="text-xs font-bold text-slate-200 truncate">ISM / Bluetooth</div>
-                        <div id="btn-band-24-sub" class="text-[10px] text-amber-400/90 font-mono">Saturé en cabine</div>
+                        <div id="btn-band-24-sub" class="text-[10px] text-emerald-400/90 font-mono">Ch 1 - 13 (Mondial)</div>
                     </button>
                     <button onclick="setBandFilter('UNII-1')" data-band="UNII-1" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
                         <div id="btn-band-unii1-sub" class="text-[10px] font-mono text-emerald-400">5 GHz Bas</div>
@@ -469,18 +464,15 @@
                 euBannerText: "Interdiction totale des 16 canaux 5 GHz U-NII-2A/2C (Ch 52 à 144) dans les aéronefs sur l'espace européen (Décision UE 2022/179).",
                 euBannerBadge: "Horizon 2030 Conforme",
                 filterTitle: "1. Filtrer la Carte Mondiale par Bande ou Canal (Mode Inverse)",
-                filterActiveDefault: "Filtre actif : Toutes bandes sauf ISM (Bluetooth)",
+                filterActiveDefault: "Filtre actif : Toutes bandes sauf ISM (Saturation BT en cabine)",
                 filterActiveBand: "Filtre Bande : ",
                 filterActiveChannel: "Filtre Canal : ",
-                btIsmOn: "Coupure ISM (Saturation BT) : ON",
-                btIsmOff: "Coupure ISM (Saturation BT) : OFF",
                 btnReset: "Réinitialiser",
                 bandAllTag: "SANS ISM (BT)",
                 bandAllTitle: "Toutes sauf ISM",
                 bandAllSub: "Exclut 2.4G (Saturé BT)",
                 band24Title: "ISM / Bluetooth",
-                band24SubMuted: "Coupé (Saturation BT)",
-                band24SubActive: "Ch 1 - 13 (Actif)",
+                band24SubActive: "Ch 1 - 13 (Mondial)",
                 bandUnii1Sub: "5 GHz Bas",
                 bandUnii1Note: "Ch 36 - 48 (Seul 5G UE)",
                 bandUnii2Note: "Banni UE 2029",
@@ -491,7 +483,7 @@
                 searchPlaceholder: "Rechercher un pays (ex: France, Japon, Brésil)...",
                 legAllowed: "Autorisé (Gate-to-Gate / LPI Cabine)",
                 legConditional: "Sous conditions (AFC / >10 000 ft / DFS)",
-                legForbidden: "Interdit à bord ou Coupé (IMT / Radar / BT ISM)",
+                legForbidden: "Interdit à bord (Protégé IMT-2030 / FSS / Radar)",
                 legHint: "Cliquez sur un pays ou survolez une route aérienne (FIR)",
                 analyzerTitle: "2. Analyseur Spectral & Sélection Directe de Canal Wi-Fi (802.11be / 802.11bn)",
                 analyzerSubtitle: "Cliquez sur un canal spécifique ci-dessous pour filtrer instantanément les espaces aériens où il est autorisé en 2030.",
@@ -511,12 +503,10 @@
                 footerStandard: "Standard Cabine : IEEE 802.11be (Wi-Fi 7) & 802.11bn (Wi-Fi 8)",
                 ttStatusAllowed: "● Autorisé en Cabine",
                 ttStatusConditional: "▲ Autorisé sous Conditions",
-                ttStatusForbidden: "✖ Restreint / Coupé à bord",
+                ttStatusForbidden: "✖ Interdit / Restreint à bord",
                 badgeAllowed: "AUTORISÉ",
                 badgeConditional: "CONDITIONNEL",
                 badgeForbidden: "INTERDIT",
-                badgeMutedBt: "COUPÉ (SATURATION BT)",
-                ismMutedDetail: "Bande ISM 2.4 GHz désactivée par l'ONC : saturation RF extrême en cabine due aux écouteurs et appareils Bluetooth passagers.",
                 eirpLabel: "PIRE Max :",
                 inCabin: "en cabine"
             },
@@ -532,18 +522,15 @@
                 euBannerText: "Complete ban of all 16 5 GHz U-NII-2A/2C channels (Ch 52 to 144) in aircraft across European airspace (EU Decision 2022/179).",
                 euBannerBadge: "2030 Compliant",
                 filterTitle: "1. Filter Global Map by Band or Channel (Inverse Mode)",
-                filterActiveDefault: "Active Filter: All Bands except ISM (Bluetooth)",
+                filterActiveDefault: "Active Filter: All Bands except ISM (In-Cabin BT Saturation)",
                 filterActiveBand: "Band Filter: ",
                 filterActiveChannel: "Channel Filter: ",
-                btIsmOn: "ISM Cutoff (BT Saturation): ON",
-                btIsmOff: "ISM Cutoff (BT Saturation): OFF",
                 btnReset: "Reset",
                 bandAllTag: "NO ISM (BT)",
                 bandAllTitle: "All except ISM",
                 bandAllSub: "Excl. 2.4G (BT Saturated)",
                 band24Title: "ISM / Bluetooth",
-                band24SubMuted: "Muted (BT Saturation)",
-                band24SubActive: "Ch 1 - 13 (Active)",
+                band24SubActive: "Ch 1 - 13 (Worldwide)",
                 bandUnii1Sub: "5 GHz Low",
                 bandUnii1Note: "Ch 36 - 48 (Sole EU 5G)",
                 bandUnii2Note: "EU 2029 Banned",
@@ -554,7 +541,7 @@
                 searchPlaceholder: "Search a country (e.g. France, Japan, Brazil)...",
                 legAllowed: "Authorized (Gate-to-Gate / In-Cabin LPI)",
                 legConditional: "Conditional (AFC / >10,000 ft / DFS)",
-                legForbidden: "Prohibited or Muted on board (IMT / Radar / BT ISM)",
+                legForbidden: "Prohibited on board (IMT-2030 / FSS / Radar Protected)",
                 legHint: "Click on a country or hover over a flight route (FIR)",
                 analyzerTitle: "2. Spectral Analyzer & Direct Wi-Fi Channel Selection (802.11be / 802.11bn)",
                 analyzerSubtitle: "Click on any specific channel below to instantly highlight global airspaces where it is permitted in 2030.",
@@ -574,12 +561,10 @@
                 footerStandard: "Cabin Standard: IEEE 802.11be (Wi-Fi 7) & 802.11bn (Wi-Fi 8)",
                 ttStatusAllowed: "● In-Cabin Authorized",
                 ttStatusConditional: "▲ Conditional Authorization",
-                ttStatusForbidden: "✖ Prohibited / Muted on Board",
+                ttStatusForbidden: "✖ Prohibited / Restricted on Board",
                 badgeAllowed: "AUTHORIZED",
                 badgeConditional: "CONDITIONAL",
                 badgeForbidden: "PROHIBITED",
-                badgeMutedBt: "MUTED (BT SATURATION)",
-                ismMutedDetail: "2.4 GHz ISM band disabled by ONC: extreme in-cabin RF saturation caused by passenger Bluetooth headphones & wearables.",
                 eirpLabel: "Max EIRP:",
                 inCabin: "in-cabin"
             }
@@ -1604,7 +1589,6 @@
             selectedCountryName: 'France',
             activeRoute: 'CDG-HND',       // Route officielle active par défaut pour visualiser les FIR
             highlightedBw: 20,
-            disableIsmBt: true,           // Désactivation totale des bandes ISM communes au Bluetooth (saturation cabine)
             hoveredFirIcao: null          // Code OACI de la FIR survolée
         };
 
@@ -1612,7 +1596,7 @@
         let worldCountriesFeatures = [];
 
         /***********************************************************************
-         * 3. GESTION DE LA LANGUE (FR / EN) & BOUTON SATURATION BLUETOOTH ISM
+         * 3. GESTION DE LA LANGUE (FR / EN)
          ***********************************************************************/
         function setLanguage(lang) {
             currentState.lang = lang;
@@ -1649,6 +1633,7 @@
             document.getElementById('btn-band-all-title').textContent = t.bandAllTitle;
             document.getElementById('btn-band-all-sub').textContent = t.bandAllSub;
             document.getElementById('btn-band-24-title').textContent = t.band24Title;
+            document.getElementById('btn-band-24-sub').textContent = t.band24SubActive;
             document.getElementById('btn-band-unii1-sub').textContent = t.bandUnii1Sub;
             document.getElementById('btn-band-unii1-note').textContent = t.bandUnii1Note;
             document.getElementById('btn-band-unii2-note').textContent = t.bandUnii2Note;
@@ -1684,43 +1669,11 @@
             document.getElementById('ui-footer-standard').textContent = t.footerStandard;
 
             // 3. Re-génération des listes dynamiques
-            updateBtIsmButtonUI();
             populateRouteSelectorOptions();
             updateActiveFilterBadge();
             updateInspectorPanel(currentState.selectedCountryName);
             renderHandoverTimeline();
             updateMapColors();
-        }
-
-        function toggleIsmBluetoothMute() {
-            currentState.disableIsmBt = !currentState.disableIsmBt;
-            updateBtIsmButtonUI();
-            updateMapColors();
-            updateInspectorPanel(currentState.selectedCountryName);
-            renderHandoverTimeline();
-        }
-
-        function updateBtIsmButtonUI() {
-            const t = TRANSLATIONS[currentState.lang];
-            const btn = document.getElementById('bt-ism-toggle');
-            const label = document.getElementById('ui-bt-ism-label');
-            const sub24 = document.getElementById('btn-band-24-sub');
-
-            if (currentState.disableIsmBt) {
-                btn.className = 'text-xs font-mono px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30';
-                label.textContent = t.btIsmOn;
-                if (sub24) {
-                    sub24.textContent = t.band24SubMuted;
-                    sub24.className = 'text-[10px] text-rose-400 font-mono';
-                }
-            } else {
-                btn.className = 'text-xs font-mono px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 bg-slate-800/80 text-slate-400 border border-slate-700 hover:text-slate-200';
-                label.textContent = t.btIsmOff;
-                if (sub24) {
-                    sub24.textContent = t.band24SubActive;
-                    sub24.className = 'text-[10px] text-emerald-400 font-mono';
-                }
-            }
         }
 
         function populateRouteSelectorOptions() {
@@ -1793,20 +1746,11 @@
             const prof = info.profile;
             const phase = currentState.flightPhase;
             const isEn = currentState.lang === 'en';
-            const t = TRANSLATIONS[currentState.lang];
 
             // Si un canal spécifique est sélectionné
             if (currentState.selectedChannel) {
                 const bandId = currentState.selectedChannel.bandId;
                 const chId = currentState.selectedChannel.ch;
-
-                // Si la bande 2.4G ISM est coupée à cause de la saturation Bluetooth cabine
-                if (bandId === '2.4G' && currentState.disableIsmBt) {
-                    return {
-                        status: 'FORBIDDEN',
-                        label: t.ismMutedDetail
-                    };
-                }
 
                 // Application stricte Décision (UE) 2022/179
                 if (bandId === 'UNII-2' && info.profileKey === 'CEPT_EU') {
@@ -1866,14 +1810,8 @@
                 };
             }
 
-            // Si une bande spécifique est sélectionnée
+            // Si une bande spécifique est sélectionnée (y compris 2.4G disponible partout dans le monde)
             if (currentState.selectedBand !== 'NO_ISM') {
-                if (currentState.selectedBand === '2.4G' && currentState.disableIsmBt) {
-                    return {
-                        status: 'FORBIDDEN',
-                        label: t.ismMutedDetail
-                    };
-                }
                 const bandRule = prof.bands[currentState.selectedBand];
                 const detailText = bandRule.detail[currentState.lang] || bandRule.detail.fr;
                 return {
@@ -1882,23 +1820,23 @@
                 };
             }
 
-            // Vue "Toutes bandes sauf ISM (Bluetooth)" : évaluation sur 5 GHz, 6 GHz et 60 GHz uniquement
+            // Vue "Toutes bandes sauf ISM (Bluetooth)" : hypothèse d'exclusion du 2.4 GHz saturé par le Bluetooth en cabine
             const u5 = prof.bands['UNII-5'][phase];
             const u7 = prof.bands['UNII-7'][phase];
             if (u5 === 'ALLOWED' && (u7 === 'ALLOWED' || u7 === 'CONDITIONAL')) {
                 return {
                     status: 'ALLOWED',
-                    label: isEn ? `Score ${prof.score}% (No ISM) • 5G / 6G / 60G (${prof.maxBw})` : `Indice ${prof.score}% (Hors ISM) • 5G / 6G / 60G (${prof.maxBw})`
+                    label: isEn ? `Score ${prof.score}% (Excl. BT-saturated 2.4G ISM) • 5G / 6G / 60G (${prof.maxBw})` : `Indice ${prof.score}% (Hors ISM 2.4G saturé BT) • 5G / 6G / 60G (${prof.maxBw})`
                 };
             } else if (u5 === 'ALLOWED' || u5 === 'CONDITIONAL') {
                 return {
                     status: 'CONDITIONAL',
-                    label: isEn ? `Score ${prof.score}% (No ISM) • 5G active, conditional 6 GHz` : `Indice ${prof.score}% (Hors ISM) • 5G actif, 6 GHz partiel/conditionnel`
+                    label: isEn ? `Score ${prof.score}% (Excl. BT-saturated 2.4G ISM) • 5G active, conditional 6 GHz` : `Indice ${prof.score}% (Hors ISM 2.4G saturé BT) • 5G actif, 6 GHz partiel/conditionnel`
                 };
             }
             return {
                 status: 'CONDITIONAL',
-                label: isEn ? `Score ${prof.score}% (No ISM) • 5G U-NII-1/3 only (6 GHz restricted)` : `Indice ${prof.score}% (Hors ISM) • 5G U-NII-1/3 seul (6 GHz restreint)`
+                label: isEn ? `Score ${prof.score}% (Excl. BT-saturated 2.4G ISM) • 5G U-NII-1/3 only (6 GHz restricted)` : `Indice ${prof.score}% (Hors ISM 2.4G saturé BT) • 5G U-NII-1/3 seul (6 GHz restreint)`
             };
         }
 
@@ -2054,14 +1992,12 @@
             const countryInfo = getCountryInfo(currentState.selectedCountryName, centroid);
             const prof = countryInfo.profile;
             const phase = currentState.flightPhase;
-            const t = TRANSLATIONS[currentState.lang];
 
             let html = '';
 
             BANDS_CATALOG.forEach(band => {
                 const bandRule = prof.bands[band.id];
-                const isIsmMuted = (band.id === '2.4G' && currentState.disableIsmBt);
-                const bandStatus = isIsmMuted ? 'FORBIDDEN' : bandRule[phase];
+                const bandStatus = bandRule[phase];
                 const isBandSelected = currentState.selectedBand === band.id;
                 const bandTitle = band.name[currentState.lang] || band.name.fr;
 
@@ -2069,22 +2005,18 @@
                     ? 'bg-emerald-400'
                     : bandStatus === 'CONDITIONAL' ? 'bg-amber-400' : 'bg-rose-500';
 
-                const rightHeaderInfo = isIsmMuted
-                    ? `<span class="text-amber-300 font-semibold"><i class="fa-brands fa-bluetooth-b mr-1"></i>${t.badgeMutedBt}</span>`
-                    : `<span class="text-slate-300">${countryInfo.displayName} :</span> ${bandRule.eirp}`;
-
                 html += `
-                <div class="bg-slate-950/80 border ${isBandSelected ? 'border-cyan-400/70' : 'border-slate-800/80'} ${isIsmMuted ? 'opacity-65' : ''} rounded-xl p-2.5 transition-all">
+                <div class="bg-slate-950/80 border ${isBandSelected ? 'border-cyan-400/70' : 'border-slate-800/80'} rounded-xl p-2.5 transition-all">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="w-2.5 h-2.5 rounded-full ${statusDot}"></span>
-                            <button onclick="setBandFilter('${band.id}')" class="text-xs font-bold text-white hover:text-cyan-300 transition-colors ${isIsmMuted ? 'line-through text-slate-400' : ''}">
+                            <button onclick="setBandFilter('${band.id}')" class="text-xs font-bold text-white hover:text-cyan-300 transition-colors">
                                 ${bandTitle}
                             </button>
                             <span class="text-[11px] font-mono text-slate-400">${band.range}</span>
                         </div>
                         <div class="text-[11px] font-mono text-slate-400">
-                            ${rightHeaderInfo}
+                            <span class="text-slate-300">${countryInfo.displayName} :</span> ${bandRule.eirp}
                         </div>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5">
@@ -2100,7 +2032,7 @@
                                     chStatus = 'FORBIDDEN';
                                 }
                             }
-                            if (band.id === '2.4G' && !isIsmMuted && c.ch === 13 && countryInfo.profileKey === 'FCC_NA') {
+                            if (band.id === '2.4G' && c.ch === 13 && countryInfo.profileKey === 'FCC_NA') {
                                 chStatus = 'CONDITIONAL';
                             }
                             if (band.id === 'UNII-2' && c.tdwr && (phase === 'ground' || countryInfo.profileKey === 'CAAC_CN' || countryInfo.profileKey === 'RCC_EURASIA')) {
@@ -2121,15 +2053,14 @@
                             const isMiitExcluded = (band.id === 'UNII-2' && countryInfo.profileKey === 'CAAC_CN' && typeof c.ch === 'number' && c.ch >= 100);
 
                             let badgeLabel = c.bw >= 1000 ? '2.1G' : c.bw + 'M';
-                            if (isIsmMuted) badgeLabel = 'BT-SAT';
-                            else if (isEuBanned) badgeLabel = currentState.lang === 'en' ? 'EU-BAN' : 'BAN-UE';
+                            if (isEuBanned) badgeLabel = currentState.lang === 'en' ? 'EU-BAN' : 'BAN-UE';
                             else if (isMiitExcluded) badgeLabel = 'NON-MIIT';
 
                             return `
                                 <button onclick="selectSpecificChannel('${band.id}', '${c.ch}', '${displayLabel} (${c.freq} MHz)')"
                                     class="channel-pill ${isSelectedCh ? 'active-filter ring-2 ring-cyan-400' : ''} ${bwHighlight} ${colorClasses} border rounded-lg px-2 py-1.5 text-left flex flex-col justify-between">
                                     <div class="flex items-center justify-between w-full">
-                                        <span class="font-mono text-xs font-bold ${(isEuBanned || isMiitExcluded || isIsmMuted) ? 'line-through text-rose-400' : ''}">${displayLabel}</span>
+                                        <span class="font-mono text-xs font-bold ${(isEuBanned || isMiitExcluded) ? 'line-through text-rose-400' : ''}">${displayLabel}</span>
                                         <span class="text-[9px] font-mono px-1 rounded bg-slate-950/60">${badgeLabel}</span>
                                     </div>
                                     <div class="text-[10px] font-mono opacity-80 mt-0.5">${c.freq} MHz</div>
@@ -2168,29 +2099,25 @@
             const bandsListEl = document.getElementById('inspector-bands-list');
             bandsListEl.innerHTML = BANDS_CATALOG.map(band => {
                 const rule = prof.bands[band.id];
-                const isIsmMuted = (band.id === '2.4G' && currentState.disableIsmBt);
-                const status = isIsmMuted ? 'FORBIDDEN' : rule[phase];
+                const status = rule[phase];
                 const bandTitle = band.name[currentState.lang] || band.name.fr;
-                const detailText = isIsmMuted ? t.ismMutedDetail : (rule.detail[currentState.lang] || rule.detail.fr);
-                const eirpText = isIsmMuted ? '0 mW (ONC Off)' : rule.eirp;
+                const detailText = rule.detail[currentState.lang] || rule.detail.fr;
 
-                const badge = isIsmMuted
-                    ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40"><i class="fa-brands fa-bluetooth-b mr-1"></i>${t.badgeMutedBt}</span>`
-                    : status === 'ALLOWED'
-                        ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">${t.badgeAllowed}</span>`
-                        : status === 'CONDITIONAL'
-                            ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">${t.badgeConditional}</span>`
-                            : `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">${t.badgeForbidden}</span>`;
+                const badge = status === 'ALLOWED'
+                    ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">${t.badgeAllowed}</span>`
+                    : status === 'CONDITIONAL'
+                        ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">${t.badgeConditional}</span>`
+                        : `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">${t.badgeForbidden}</span>`;
 
                 return `
-                    <div onclick="setBandFilter('${band.id}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-3 transition-all ${isIsmMuted ? 'opacity-70' : ''}">
+                    <div onclick="setBandFilter('${band.id}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-3 transition-all">
                         <div class="flex items-center justify-between gap-2">
-                            <div class="font-semibold text-xs text-white ${isIsmMuted ? 'line-through text-slate-400' : ''}">${bandTitle}</div>
+                            <div class="font-semibold text-xs text-white">${bandTitle}</div>
                             ${badge}
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-cyan-400 mt-1">
                             <span>${band.range}</span>
-                            <span>${t.eirpLabel} ${eirpText}</span>
+                            <span>${t.eirpLabel} ${rule.eirp}</span>
                         </div>
                         <p class="text-[11px] text-slate-400 mt-1">${detailText}</p>
                     </div>
