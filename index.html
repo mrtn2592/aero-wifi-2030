@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr" class="dark">
 <head>
@@ -91,6 +90,10 @@
         .flight-route-arc {
             stroke-dasharray: 6, 4;
             animation: dashDraw 2s linear infinite;
+        }
+        .fir-segment-hit {
+            cursor: pointer;
+            pointer-events: stroke;
         }
         /* Blocs de canaux interactifs */
         .channel-pill {
@@ -199,9 +202,14 @@
                             1. Filtrer la Carte Mondiale par Bande ou Canal (Mode Inverse)
                         </h2>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Commutateur de désactivation totale ISM (Saturation Bluetooth Cabine) -->
+                        <button id="bt-ism-toggle" onclick="toggleIsmBluetoothMute()" class="text-xs font-mono px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30" title="Désactiver les bandes ISM communes au Bluetooth (saturées par les périphériques passagers)">
+                            <i class="fa-brands fa-bluetooth-b text-cyan-400"></i>
+                            <span id="ui-bt-ism-label">Coupure ISM (Saturation BT) : ON</span>
+                        </button>
                         <span id="active-filter-badge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                            Filtre actif : Vue Globale Multi-Bandes
+                            Filtre actif : Toutes bandes sauf ISM (BT)
                         </span>
                         <button onclick="resetChannelFilter()" class="text-xs text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/60 hover:bg-slate-800">
                             <i class="fa-solid fa-rotate-left text-[10px]"></i> <span id="ui-btn-reset">Réinitialiser</span>
@@ -211,15 +219,15 @@
 
                 <!-- Boutons de sélection de bandes 2030 -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2" id="band-filter-buttons">
-                    <button onclick="setBandFilter('ALL')" data-band="ALL" class="band-btn active px-2.5 py-2 rounded-xl border text-left transition-all bg-cyan-500/20 border-cyan-400 text-white">
-                        <div class="text-[10px] font-mono text-cyan-300">GLOBAL</div>
-                        <div id="btn-band-all-title" class="text-xs font-bold truncate">Toutes Bandes</div>
-                        <div id="btn-band-all-sub" class="text-[10px] text-slate-400">Indice 2030</div>
+                    <button onclick="setBandFilter('NO_ISM')" data-band="NO_ISM" class="band-btn active px-2.5 py-2 rounded-xl border text-left transition-all bg-cyan-500/20 border-cyan-400 text-white">
+                        <div id="btn-band-all-tag" class="text-[10px] font-mono text-cyan-300">SANS ISM (BT)</div>
+                        <div id="btn-band-all-title" class="text-xs font-bold truncate">Toutes sauf ISM</div>
+                        <div id="btn-band-all-sub" class="text-[10px] text-slate-400">Exclut 2.4G (Saturé BT)</div>
                     </button>
                     <button onclick="setBandFilter('2.4G')" data-band="2.4G" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
                         <div class="text-[10px] font-mono text-emerald-400">2.4 GHz</div>
-                        <div id="btn-band-24-title" class="text-xs font-bold text-slate-200 truncate">ISM Legacy</div>
-                        <div class="text-[10px] text-slate-400">Ch 1 - 13</div>
+                        <div id="btn-band-24-title" class="text-xs font-bold text-slate-200 truncate">ISM / Bluetooth</div>
+                        <div id="btn-band-24-sub" class="text-[10px] text-amber-400/90 font-mono">Saturé en cabine</div>
                     </button>
                     <button onclick="setBandFilter('UNII-1')" data-band="UNII-1" class="band-btn px-2.5 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-slate-700 text-left transition-all">
                         <div id="btn-band-unii1-sub" class="text-[10px] font-mono text-emerald-400">5 GHz Bas</div>
@@ -273,9 +281,6 @@
                         </button>
                         <button onclick="zoomMap(0.7)" title="Dézoomer" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-xs transition-colors">
                             <i class="fa-solid fa-minus"></i>
-                        </button>
-                        <button onclick="resetMapZoom()" title="Réinitialiser la vue" class="px-2 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-[11px] font-mono transition-colors">
-                            1:1
                         </button>
                     </div>
                 </div>
@@ -421,12 +426,12 @@
                         <i class="fa-solid fa-satellite-dish"></i>
                         3. Plan de Commutation Automatique (ONC)
                     </h3>
-                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">ISO/IEC Aero-WiFi 2030</span>
+                    <span id="fir-count-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">20 FIR traversées</span>
                 </div>
                 <p id="ui-handover-subtitle" class="text-[11px] text-slate-400">
-                    Simulation de l'adaptation dynamique des points d'accès cabine lors du franchissement des frontières FIR :
+                    Liste exhaustive des FIR traversées sur la route officielle (survolez la trajectoire sur la carte ou une étape ci-dessous) :
                 </p>
-                <div id="flight-handover-timeline" class="space-y-2.5 text-xs">
+                <div id="flight-handover-timeline" class="space-y-2 max-h-[340px] overflow-y-auto pr-1 text-xs">
                     <!-- Rempli par JS selon la route -->
                 </div>
             </div>
@@ -459,18 +464,23 @@
                 btnCruise: "Croisière (> FL100 / 10 000 ft)",
                 btnGround: "Gate-to-Gate (Sol & Basse Alt.)",
                 corridorLabel: "Corridor 2030 :",
-                noActiveRoute: "-- Aucun vol actif --",
+                noActiveRoute: "-- Aucun vol affiché sur la carte --",
                 euBannerTitle: "Règle UE 2029 active :",
                 euBannerText: "Interdiction totale des 16 canaux 5 GHz U-NII-2A/2C (Ch 52 à 144) dans les aéronefs sur l'espace européen (Décision UE 2022/179).",
                 euBannerBadge: "Horizon 2030 Conforme",
                 filterTitle: "1. Filtrer la Carte Mondiale par Bande ou Canal (Mode Inverse)",
-                filterActiveDefault: "Filtre actif : Vue Globale Multi-Bandes",
+                filterActiveDefault: "Filtre actif : Toutes bandes sauf ISM (Bluetooth)",
                 filterActiveBand: "Filtre Bande : ",
                 filterActiveChannel: "Filtre Canal : ",
+                btIsmOn: "Coupure ISM (Saturation BT) : ON",
+                btIsmOff: "Coupure ISM (Saturation BT) : OFF",
                 btnReset: "Réinitialiser",
-                bandAllTitle: "Toutes Bandes",
-                bandAllSub: "Indice 2030",
-                band24Title: "ISM Legacy",
+                bandAllTag: "SANS ISM (BT)",
+                bandAllTitle: "Toutes sauf ISM",
+                bandAllSub: "Exclut 2.4G (Saturé BT)",
+                band24Title: "ISM / Bluetooth",
+                band24SubMuted: "Coupé (Saturation BT)",
+                band24SubActive: "Ch 1 - 13 (Actif)",
                 bandUnii1Sub: "5 GHz Bas",
                 bandUnii1Note: "Ch 36 - 48 (Seul 5G UE)",
                 bandUnii2Note: "Banni UE 2029",
@@ -481,8 +491,8 @@
                 searchPlaceholder: "Rechercher un pays (ex: France, Japon, Brésil)...",
                 legAllowed: "Autorisé (Gate-to-Gate / LPI Cabine)",
                 legConditional: "Sous conditions (AFC / >10 000 ft / DFS)",
-                legForbidden: "Interdit à bord (Protégé IMT-2030 / FSS / Radar)",
-                legHint: "Cliquez sur un pays pour inspecter ses canaux",
+                legForbidden: "Interdit à bord ou Coupé (IMT / Radar / BT ISM)",
+                legHint: "Cliquez sur un pays ou survolez une route aérienne (FIR)",
                 analyzerTitle: "2. Analyseur Spectral & Sélection Directe de Canal Wi-Fi (802.11be / 802.11bn)",
                 analyzerSubtitle: "Cliquez sur un canal spécifique ci-dessous pour filtrer instantanément les espaces aériens où il est autorisé en 2030.",
                 widthLabel: "Largeur :",
@@ -495,15 +505,18 @@
                 modeCruise: "Mode : Croisière (>FL100)",
                 modeGround: "Mode : Gate-to-Gate (Sol)",
                 handoverTitle: "3. Plan de Commutation Automatique (ONC)",
-                handoverSubtitle: "Simulation de l'adaptation dynamique des points d'accès cabine lors du franchissement des frontières FIR :",
+                handoverSubtitle: "Liste exhaustive des FIR traversées sur la route officielle (survolez la trajectoire sur la carte ou une étape ci-dessous) :",
+                firCountSuffix: "FIR traversées",
                 footerText: "Base de données prospective basée sur les résolutions UIT WRC-23 / WRC-27, FCC Part 15E, CEPT ECC/DEC/(24)01 et ARINC 848.",
                 footerStandard: "Standard Cabine : IEEE 802.11be (Wi-Fi 7) & 802.11bn (Wi-Fi 8)",
                 ttStatusAllowed: "● Autorisé en Cabine",
                 ttStatusConditional: "▲ Autorisé sous Conditions",
-                ttStatusForbidden: "✖ Restreint / Interdit",
+                ttStatusForbidden: "✖ Restreint / Coupé à bord",
                 badgeAllowed: "AUTORISÉ",
                 badgeConditional: "CONDITIONNEL",
                 badgeForbidden: "INTERDIT",
+                badgeMutedBt: "COUPÉ (SATURATION BT)",
+                ismMutedDetail: "Bande ISM 2.4 GHz désactivée par l'ONC : saturation RF extrême en cabine due aux écouteurs et appareils Bluetooth passagers.",
                 eirpLabel: "PIRE Max :",
                 inCabin: "en cabine"
             },
@@ -514,18 +527,23 @@
                 btnCruise: "Cruise (> FL100 / 10,000 ft)",
                 btnGround: "Gate-to-Gate (Ground & Low Alt.)",
                 corridorLabel: "2030 Corridor:",
-                noActiveRoute: "-- No active flight --",
+                noActiveRoute: "-- No flight displayed on map --",
                 euBannerTitle: "Active EU 2029 Rule:",
                 euBannerText: "Complete ban of all 16 5 GHz U-NII-2A/2C channels (Ch 52 to 144) in aircraft across European airspace (EU Decision 2022/179).",
                 euBannerBadge: "2030 Compliant",
                 filterTitle: "1. Filter Global Map by Band or Channel (Inverse Mode)",
-                filterActiveDefault: "Active Filter: Multi-Band Global Overview",
+                filterActiveDefault: "Active Filter: All Bands except ISM (Bluetooth)",
                 filterActiveBand: "Band Filter: ",
                 filterActiveChannel: "Channel Filter: ",
+                btIsmOn: "ISM Cutoff (BT Saturation): ON",
+                btIsmOff: "ISM Cutoff (BT Saturation): OFF",
                 btnReset: "Reset",
-                bandAllTitle: "All Bands",
-                bandAllSub: "2030 Index",
-                band24Title: "ISM Legacy",
+                bandAllTag: "NO ISM (BT)",
+                bandAllTitle: "All except ISM",
+                bandAllSub: "Excl. 2.4G (BT Saturated)",
+                band24Title: "ISM / Bluetooth",
+                band24SubMuted: "Muted (BT Saturation)",
+                band24SubActive: "Ch 1 - 13 (Active)",
                 bandUnii1Sub: "5 GHz Low",
                 bandUnii1Note: "Ch 36 - 48 (Sole EU 5G)",
                 bandUnii2Note: "EU 2029 Banned",
@@ -536,8 +554,8 @@
                 searchPlaceholder: "Search a country (e.g. France, Japan, Brazil)...",
                 legAllowed: "Authorized (Gate-to-Gate / In-Cabin LPI)",
                 legConditional: "Conditional (AFC / >10,000 ft / DFS)",
-                legForbidden: "Prohibited on board (IMT-2030 / FSS / Radar protected)",
-                legHint: "Click on a country to inspect its authorized channels",
+                legForbidden: "Prohibited or Muted on board (IMT / Radar / BT ISM)",
+                legHint: "Click on a country or hover over a flight route (FIR)",
                 analyzerTitle: "2. Spectral Analyzer & Direct Wi-Fi Channel Selection (802.11be / 802.11bn)",
                 analyzerSubtitle: "Click on any specific channel below to instantly highlight global airspaces where it is permitted in 2030.",
                 widthLabel: "Width:",
@@ -550,15 +568,18 @@
                 modeCruise: "Mode: Cruise (>FL100)",
                 modeGround: "Mode: Gate-to-Gate (Ground)",
                 handoverTitle: "3. Automated Handover Plan (ONC)",
-                handoverSubtitle: "Simulation of dynamic cabin access point reconfiguration across FIR border crossings:",
+                handoverSubtitle: "Exhaustive list of applicable FIRs along the official flight route (hover over the map route or any step below):",
+                firCountSuffix: "FIRs crossed",
                 footerText: "Prospective spectrum database based on ITU WRC-23 / WRC-27 resolutions, FCC Part 15E, CEPT ECC/DEC/(24)01, and ARINC 848.",
                 footerStandard: "Cabin Standard: IEEE 802.11be (Wi-Fi 7) & 802.11bn (Wi-Fi 8)",
                 ttStatusAllowed: "● In-Cabin Authorized",
                 ttStatusConditional: "▲ Conditional Authorization",
-                ttStatusForbidden: "✖ Prohibited / Restricted",
+                ttStatusForbidden: "✖ Prohibited / Muted on Board",
                 badgeAllowed: "AUTHORIZED",
                 badgeConditional: "CONDITIONAL",
                 badgeForbidden: "PROHIBITED",
+                badgeMutedBt: "MUTED (BT SATURATION)",
+                ismMutedDetail: "2.4 GHz ISM band disabled by ONC: extreme in-cabin RF saturation caused by passenger Bluetooth headphones & wearables.",
                 eirpLabel: "Max EIRP:",
                 inCabin: "in-cabin"
             }
@@ -948,42 +969,229 @@
         };
 
         /**
-         * Corridors aériens pour le simulateur de commutation automatique en vol
+         * Corridors aériens officiels avec liste EXHAUSTIVE des FIR traversées et géométrie segmentée
          */
         const FLIGHT_ROUTES = {
             'CDG-HND': {
                 name: { fr: 'AF274 : Paris (CDG) ➔ Tokyo (HND)', en: 'AF274: Paris (CDG) ➔ Tokyo (HND)' },
-                coords: [[2.55, 49.01], [28.97, 41.01], [69.24, 41.30], [116.40, 39.90], [139.78, 35.55]],
                 steps: [
                     {
-                        fir: { fr: 'FIR Paris / Eurocontrol (CEPT)', en: 'Paris FIR / Eurocontrol (CEPT)' },
+                        icao: 'LFFF',
+                        fir: { fr: 'FIR Paris (LFFF)', en: 'Paris FIR (LFFF)' },
+                        auth: 'ANFR / CEPT (France)',
+                        coords: [[2.55, 49.01], [4.8, 48.7]],
                         action: {
-                            fr: '5 GHz DFS Ch 52–144 éteints (Règle UE 2029) ➔ Cabine opérée sur 6 GHz U-NII-5 (Ch 33 320 MHz) + 5 GHz U-NII-1',
-                            en: '5 GHz DFS Ch 52–144 disabled (EU 2029 rule) ➔ In-cabin operated on 6 GHz U-NII-5 (Ch 33 320 MHz) + 5 GHz U-NII-1'
+                            fr: 'ISM 2.4G coupé (BT) • Ch 52–144 interdits (UE 2029) • Cabine sur 6 GHz U-NII-5 (320 MHz) + U-NII-1',
+                            en: '2.4G ISM muted (BT) • Ch 52–144 banned (EU 2029) • Cabin on 6 GHz U-NII-5 (320 MHz) + U-NII-1'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'FIR Asie Centrale (RCC)', en: 'Central Asia FIR (RCC)' },
+                        icao: 'LFEE',
+                        fir: { fr: 'FIR Reims (LFEE)', en: 'Reims FIR (LFEE)' },
+                        auth: 'ANFR / CEPT (France)',
+                        coords: [[4.8, 48.7], [7.6, 48.2]],
                         action: {
-                            fr: 'Coupure auto 6 GHz à la frontière FIR ➔ Bascule sur 5 GHz Ch 36–48 & Ch 149–161',
-                            en: 'Auto shutdown of 6 GHz at FIR border ➔ Fallback to 5 GHz Ch 36–48 & Ch 149–161'
+                            fr: 'Montée FL330 : U-NII-5 (5945–6425 MHz) + U-NII-1 (Ch 36–48) actifs • DFS Ch 52–144 coupés',
+                            en: 'Climb FL330: U-NII-5 (5945–6425 MHz) + U-NII-1 (Ch 36–48) active • DFS Ch 52–144 disabled'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'EDUU',
+                        fir: { fr: 'UIR Rhein / Karlsruhe (EDUU)', en: 'Rhein UIR / Karlsruhe (EDUU)' },
+                        auth: 'BNetzA / CEPT (Allemagne)',
+                        coords: [[7.6, 48.2], [11.2, 48.3]],
+                        action: {
+                            fr: 'Croisière >FL200 : U-NII-5 LPI + activation AFC sur 6 GHz Haut • Ch 52–144 interdits (UE 2029)',
+                            en: 'Cruise >FL200: U-NII-5 LPI + AFC enabled on Upper 6 GHz • Ch 52–144 banned (EU 2029)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'EDMM',
+                        fir: { fr: 'FIR München (EDMM)', en: 'Munich FIR (EDMM)' },
+                        auth: 'BNetzA / CEPT (Allemagne)',
+                        coords: [[11.2, 48.3], [13.4, 47.9]],
+                        action: {
+                            fr: 'Continuité CEPT : 6 GHz U-NII-5 (320 MHz) + 5 GHz U-NII-1 (200 mW) + 60 GHz IFE',
+                            en: 'CEPT continuity: 6 GHz U-NII-5 (320 MHz) + 5 GHz U-NII-1 (200 mW) + 60 GHz IFE'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'LOVV',
+                        fir: { fr: 'FIR Wien / Vienne (LOVV)', en: 'Vienna FIR (LOVV)' },
+                        auth: 'RTR / CEPT (Autriche)',
+                        coords: [[13.4, 47.9], [17.1, 47.7]],
+                        action: {
+                            fr: 'Maintien U-NII-5 (Ch 33/65) & U-NII-1 • Exclusion totale U-NII-2A/2C (Décision UE 2022/179)',
+                            en: 'Retain U-NII-5 (Ch 33/65) & U-NII-1 • Total exclusion of U-NII-2A/2C (EU Decision 2022/179)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'LHCC',
+                        fir: { fr: 'FIR Budapest (LHCC)', en: 'Budapest FIR (LHCC)' },
+                        auth: 'NMHH / CEPT (Hongrie)',
+                        coords: [[17.1, 47.7], [21.8, 46.8]],
+                        action: {
+                            fr: 'Maintien profil CEPT : 6 GHz U-NII-5 + 5 GHz Ch 36–48 (200 mW) + U-NII-3 (25 mW SRD)',
+                            en: 'CEPT profile maintained: 6 GHz U-NII-5 + 5 GHz Ch 36–48 (200 mW) + U-NII-3 (25 mW SRD)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'LRBB',
+                        fir: { fr: 'FIR București (LRBB)', en: 'Bucharest FIR (LRBB)' },
+                        auth: 'ANCOM / CEPT (Roumanie)',
+                        coords: [[21.8, 46.8], [29.6, 44.1]],
+                        action: {
+                            fr: 'Survol Roumanie & Mer Noire Ouest : 6 GHz U-NII-5 (320 MHz) + U-NII-1 actifs',
+                            en: 'Romania & West Black Sea transit: 6 GHz U-NII-5 (320 MHz) + U-NII-1 active'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'LTAA',
+                        fir: { fr: 'FIR Ankara (LTAA)', en: 'Ankara FIR (LTAA)' },
+                        auth: 'BTK / CEPT (Turquie)',
+                        coords: [[29.6, 44.1], [36.0, 42.2], [41.5, 41.5]],
+                        action: {
+                            fr: 'Alignement CEPT/BTK : U-NII-5 LPI (200 mW) + U-NII-1 (Ch 36–48) maintenus en croisière',
+                            en: 'CEPT/BTK alignment: U-NII-5 LPI (200 mW) + U-NII-1 (Ch 36–48) maintained in cruise'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'UGGG',
+                        fir: { fr: 'FIR Tbilisi (UGGG)', en: 'Tbilisi FIR (UGGG)' },
+                        auth: 'GNCC / CEPT (Géorgie)',
+                        coords: [[41.5, 41.5], [45.8, 41.2]],
+                        action: {
+                            fr: 'Corridor Sud-Caucase : U-NII-5 LPI actif • Préparation bascule frontière RCC',
+                            en: 'South Caucasus corridor: U-NII-5 LPI active • Preparing RCC border handover'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'UBBA',
+                        fir: { fr: 'FIR Baku (UBBA)', en: 'Baku FIR (UBBA)' },
+                        auth: 'MinCom / RCC (Azerbaïdjan)',
+                        coords: [[45.8, 41.2], [51.8, 40.6]],
+                        action: {
+                            fr: 'Entrée zone RCC & Mer Caspienne : Restriction 6 GHz (protection FSS) ➔ Bascule sur U-NII-1 & U-NII-3',
+                            en: 'RCC & Caspian Sea entry: 6 GHz restricted (FSS protection) ➔ Handover to U-NII-1 & U-NII-3'
                         },
                         status: 'CONDITIONAL'
                     },
                     {
-                        fir: { fr: 'FIR Pékin / CAAC (Chine)', en: 'Beijing FIR / CAAC (China)' },
+                        icao: 'UTAA',
+                        fir: { fr: 'FIR Ashgabat / Türkmenbaşy (UTAA)', en: 'Ashgabat / Turkmenbashi FIR (UTAA)' },
+                        auth: 'Türkmenaragatnaşyk / RCC (Turkménistan)',
+                        coords: [[51.8, 40.6], [55.5, 42.3]],
                         action: {
-                            fr: 'Application Avis MIIT n° 129 (2021) : Coupure immédiate Ch 100–144 (non alloués) et 6 GHz Haut (IMT) ➔ Maintien U-NII-1 (200 mW) et U-NII-3 (Ch 149–165, 500 mW)',
-                            en: 'MIIT Notice No. 129 compliance: Immediate cutoff of Ch 100–144 (unallocated) & Upper 6 GHz (IMT) ➔ Retain U-NII-1 (200 mW) & U-NII-3 (Ch 149–165, 500 mW)'
+                            fr: 'Profil RCC strict : 6 GHz U-NII-5 limité à 100 mW (>FL150) • Priorité 5 GHz Ch 36–48 & Ch 149–165',
+                            en: 'Strict RCC profile: 6 GHz U-NII-5 capped at 100 mW (>FL150) • Priority to 5 GHz Ch 36–48 & 149–165'
                         },
                         status: 'CONDITIONAL'
                     },
                     {
-                        fir: { fr: 'FIR Fukuoka / Tokyo (JCAB)', en: 'Fukuoka / Tokyo FIR (JCAB)' },
+                        icao: 'UATT',
+                        fir: { fr: 'FIR Aktobe (UATT)', en: 'Aktobe FIR (UATT)' },
+                        auth: 'Kazaeronavigatsia / RCC (Kazakhstan)',
+                        coords: [[55.5, 42.3], [63.5, 44.8]],
                         action: {
-                            fr: 'Réactivation 6 GHz U-NII-5 (320 MHz) jusqu’au parking porte HND',
-                            en: 'Re-activation of 6 GHz U-NII-5 (320 MHz) down to HND gate parking'
+                            fr: 'Survol Kazakhstan Ouest : Ch 52–144 interdits (radars) • Maintien U-NII-1 (200 mW) & U-NII-3 (100 mW)',
+                            en: 'West Kazakhstan transit: Ch 52–144 barred (radars) • Retain U-NII-1 (200 mW) & U-NII-3 (100 mW)'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'UAII',
+                        fir: { fr: 'FIR Shymkent (UAII)', en: 'Shymkent FIR (UAII)' },
+                        auth: 'Kazaeronavigatsia / RCC (Kazakhstan)',
+                        coords: [[63.5, 44.8], [70.5, 44.4]],
+                        action: {
+                            fr: 'Continuité RCC Kazakhstan Sud : 5 GHz U-NII-1 + U-NII-3 + 60 GHz mmWave en cabine',
+                            en: 'South Kazakhstan RCC continuity: 5 GHz U-NII-1 + U-NII-3 + 60 GHz mmWave in-cabin'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'UAAA',
+                        fir: { fr: 'FIR Almaty (UAAA)', en: 'Almaty FIR (UAAA)' },
+                        auth: 'Kazaeronavigatsia / RCC (Kazakhstan)',
+                        coords: [[70.5, 44.4], [80.2, 44.1]],
+                        action: {
+                            fr: 'Approche frontière chinoise : Pré-synchronisation profil MIIT Notice 129 / CAAC',
+                            en: 'Approaching Chinese border: Pre-synchronizing MIIT Notice 129 / CAAC profile'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'ZWUQ',
+                        fir: { fr: 'FIR Ürümqi (ZWUQ)', en: 'Urumqi FIR (ZWUQ)' },
+                        auth: 'MIIT 129 / CAAC (Chine)',
+                        coords: [[80.2, 44.1], [88.0, 43.0], [96.5, 41.5]],
+                        action: {
+                            fr: 'Entrée Chine (Avis MIIT 129) : Ch 100–144 & 6 GHz Haut coupés • Bascule U-NII-3 (500 mW) + U-NII-1 (200 mW)',
+                            en: 'China Entry (MIIT Notice 129): Ch 100–144 & Upper 6 GHz cut • Switch to U-NII-3 (500 mW) + U-NII-1 (200 mW)'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'ZLHW',
+                        fir: { fr: 'FIR Lanzhou (ZLHW)', en: 'Lanzhou FIR (ZLHW)' },
+                        auth: 'MIIT 129 / CAAC (Chine)',
+                        coords: [[96.5, 41.5], [104.0, 40.5], [111.0, 39.8]],
+                        action: {
+                            fr: 'Conformité MIIT 129 : U-NII-3 Ch 149–165 (500 mW) + U-NII-1 Ch 36–48 + Ch 52–64 (DFS non débrayable)',
+                            en: 'MIIT 129 compliance: U-NII-3 Ch 149–165 (500 mW) + U-NII-1 Ch 36–48 + Ch 52–64 (non-disableable DFS)'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'ZBPE',
+                        fir: { fr: 'FIR Beijing / Pékin (ZBPE)', en: 'Beijing FIR (ZBPE)' },
+                        auth: 'MIIT 129 / CAAC (Chine)',
+                        coords: [[111.0, 39.8], [116.4, 39.9], [121.2, 38.8]],
+                        action: {
+                            fr: 'Survol Pékin : Protection stricte IMT-2030 sur 6 GHz Haut • Trafic cabine sur U-NII-3 (500 mW) & 60 GHz',
+                            en: 'Beijing transit: Strict IMT-2030 protection on Upper 6 GHz • Cabin traffic on U-NII-3 (500 mW) & 60 GHz'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'ZYSH',
+                        fir: { fr: 'FIR Shenyang (ZYSH)', en: 'Shenyang FIR (ZYSH)' },
+                        auth: 'MIIT 129 / CAAC (Chine)',
+                        coords: [[121.2, 38.8], [124.2, 37.6]],
+                        action: {
+                            fr: 'Sortie Mer Jaune (MIIT 129) : Maintien U-NII-1 & U-NII-3 jusqu’à la limite FIR Incheon',
+                            en: 'Yellow Sea exit (MIIT 129): Retain U-NII-1 & U-NII-3 up to Incheon FIR boundary'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'RKRR',
+                        fir: { fr: 'FIR Incheon (RKRR)', en: 'Incheon FIR (RKRR)' },
+                        auth: 'MSIT / KCC (Corée du Sud)',
+                        coords: [[124.2, 37.6], [130.5, 36.2]],
+                        action: {
+                            fr: 'Entrée Corée du Sud : Réouverture complète 6 GHz U-NII-5 (320 MHz LPI) + 5 GHz U-NII-1/3',
+                            en: 'South Korea Entry: Full re-activation of 6 GHz U-NII-5 (320 MHz LPI) + 5 GHz U-NII-1/3'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'RJJJ',
+                        fir: { fr: 'FIR Fukuoka / Tokyo (RJJJ)', en: 'Fukuoka / Tokyo FIR (RJJJ)' },
+                        auth: 'MIC / JCAB (Japon)',
+                        coords: [[130.5, 36.2], [135.5, 35.4], [139.78, 35.55]],
+                        action: {
+                            fr: 'Descente & Approche Haneda : Maintien 6 GHz U-NII-5 (320 MHz) + U-NII-1 Gate-to-Gate • Coupure U-NII-3 <FL100',
+                            en: 'Haneda Descent & Approach: Retain 6 GHz U-NII-5 (320 MHz) + U-NII-1 Gate-to-Gate • Mute U-NII-3 <FL100'
                         },
                         status: 'ALLOWED'
                     }
@@ -991,59 +1199,196 @@
             },
             'JFK-LHR': {
                 name: { fr: 'BA112 : New York (JFK) ➔ Londres (LHR)', en: 'BA112: New York (JFK) ➔ London (LHR)' },
-                coords: [[-73.78, 40.64], [-52.71, 47.56], [-30.0, 53.0], [-8.5, 52.5], [-0.45, 51.47]],
                 steps: [
                     {
-                        fir: { fr: 'FIR New York (FCC)', en: 'New York FIR (FCC)' },
+                        icao: 'KZNY',
+                        fir: { fr: 'FIR New York (KZNY)', en: 'New York FIR (KZNY)' },
+                        auth: 'FCC Part 15E (USA)',
+                        coords: [[-73.78, 40.64], [-71.5, 41.6]],
                         action: {
-                            fr: 'Full 6 GHz (U-NII-5 à U-NII-8) + 5 GHz U-NII-1/3 (2x 320 MHz actifs)',
-                            en: 'Full 6 GHz (U-NII-5 to U-NII-8) + 5 GHz U-NII-1/3 (2x 320 MHz active)'
+                            fr: 'Décollage JFK : Spectre complet 6 GHz (U-NII-5 à 8, 2x 320 MHz) + 5 GHz U-NII-1/3 • ISM 2.4G coupé (BT)',
+                            en: 'JFK Departure: Full 6 GHz spectrum (U-NII-5 to 8, 2x 320 MHz) + 5 GHz U-NII-1/3 • 2.4G ISM muted (BT)'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'NAT-OTS (Océan Atlantique Nord)', en: 'NAT-OTS (North Atlantic Ocean)' },
+                        icao: 'KZBW',
+                        fir: { fr: 'FIR Boston (KZBW)', en: 'Boston FIR (KZBW)' },
+                        auth: 'FCC Part 15E (USA)',
+                        coords: [[-71.5, 41.6], [-67.0, 44.4]],
                         action: {
-                            fr: 'Spectre libre océanique : Capacité maximale Wi-Fi 8 (U-NII-5/7 + 60 GHz IFE)',
-                            en: 'Oceanic airspace: Maximum Wi-Fi 8 throughput (U-NII-5/7 + 60 GHz IFE)'
+                            fr: 'Montée Nouvelle-Angleterre : 1200 MHz de spectre 6 GHz LPI actifs + U-NII-1/3 (1000 mW)',
+                            en: 'New England Climb: 1200 MHz of 6 GHz LPI spectrum active + U-NII-1/3 (1000 mW)'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'FIR Shanwick / Londres (Ofcom/CEPT)', en: 'Shanwick / London FIR (Ofcom/CEPT)' },
+                        icao: 'CZQM',
+                        fir: { fr: 'FIR Moncton (CZQM)', en: 'Moncton FIR (CZQM)' },
+                        auth: 'ISED RSS-248 (Canada)',
+                        coords: [[-67.0, 44.4], [-59.5, 46.8]],
                         action: {
-                            fr: 'Entrée espace européen : Coupure obligatoire 5 GHz DFS (Ch 52-144, UE 2029) et U-NII-7 (6G IMT-2030)',
-                            en: 'European FIR Entry: Mandatory cutoff of 5 GHz DFS (Ch 52-144, EU 2029) and U-NII-7 (6G IMT-2030)'
+                            fr: 'Harmonisation FCC/ISED : Continuité transparente sur 6 GHz (5925–7125 MHz) & 5 GHz en cabine',
+                            en: 'FCC/ISED harmonization: Seamless continuity on 6 GHz (5925–7125 MHz) & 5 GHz in-cabin'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'CZQX',
+                        fir: { fr: 'FIR Gander Domestic (CZQX)', en: 'Gander Domestic FIR (CZQX)' },
+                        auth: 'ISED RSS-248 (Canada)',
+                        coords: [[-59.5, 46.8], [-51.0, 49.0]],
+                        action: {
+                            fr: 'Survol Terre-Neuve : Pleine capacité Wi-Fi 8 (U-NII-5/6/7/8 + U-NII-1/3 + 60 GHz IFE)',
+                            en: 'Newfoundland transit: Full Wi-Fi 8 capacity (U-NII-5/6/7/8 + U-NII-1/3 + 60 GHz IFE)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'CZQX-OCA',
+                        fir: { fr: 'OCA Gander Oceanic (NAT West)', en: 'Gander Oceanic OCA (NAT West)' },
+                        auth: 'OACI / ISED (Haute Mer)',
+                        coords: [[-51.0, 49.0], [-40.0, 51.2], [-30.0, 52.5]],
+                        action: {
+                            fr: 'Atlantique Nord Ouest (NAT-OTS) : Spectre international haute mer sans restriction terrestre',
+                            en: 'West North Atlantic (NAT-OTS): International high-seas spectrum with zero terrestrial constraints'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'EGGX',
+                        fir: { fr: 'OCA Shanwick Oceanic (NAT East)', en: 'Shanwick Oceanic OCA (NAT East)' },
+                        auth: 'OACI / Ofcom (Haute Mer)',
+                        coords: [[-30.0, 52.5], [-20.0, 52.4], [-15.0, 52.1]],
+                        action: {
+                            fr: 'Atlantique Nord Est : Maintien 6 GHz complet jusqu’au point d’entrée côtier irlandais',
+                            en: 'East North Atlantic: Full 6 GHz maintained up to Irish coastal entry waypoint'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'EISN',
+                        fir: { fr: 'FIR Shannon / SOTA (EISN)', en: 'Shannon FIR / SOTA (EISN)' },
+                        auth: 'ComReg / EASA (Irlande - UE)',
+                        coords: [[-15.0, 52.1], [-8.0, 51.8], [-5.2, 51.7]],
+                        action: {
+                            fr: 'Entrée UE : Coupure immédiate 5 GHz DFS Ch 52–144 (Décision UE 2022/179) & bascule 6 GHz sur U-NII-5',
+                            en: 'EU Entry: Immediate cutoff of 5 GHz DFS Ch 52–144 (EU Decision 2022/179) & 6 GHz switch to U-NII-5'
                         },
                         status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'EGTT',
+                        fir: { fr: 'FIR London (EGTT)', en: 'London FIR (EGTT)' },
+                        auth: 'Ofcom / UK CAA (Royaume-Uni)',
+                        coords: [[-5.2, 51.7], [-2.5, 51.6], [-0.45, 51.47]],
+                        action: {
+                            fr: 'Approche Heathrow : 6 GHz U-NII-5 LPI (320 MHz) + 5 GHz U-NII-1 (Ch 36–48) maintenus jusqu’à la porte',
+                            en: 'Heathrow Approach: 6 GHz U-NII-5 LPI (320 MHz) + 5 GHz U-NII-1 (Ch 36–48) kept down to gate'
+                        },
+                        status: 'ALLOWED'
                     }
                 ]
             },
             'DXB-SYD': {
                 name: { fr: 'EK412 : Dubaï (DXB) ➔ Sydney (SYD)', en: 'EK412: Dubai (DXB) ➔ Sydney (SYD)' },
-                coords: [[55.36, 25.25], [79.86, 6.92], [103.81, 1.35], [130.84, -12.46], [151.17, -33.94]],
                 steps: [
                     {
-                        fir: { fr: 'FIR Émirats (GCAA)', en: 'Emirates FIR (GCAA)' },
+                        icao: 'OMAE',
+                        fir: { fr: 'FIR Emirates (OMAE)', en: 'Emirates FIR (OMAE)' },
+                        auth: 'TDRA / GCAA (Émirats Arabes Unis)',
+                        coords: [[55.36, 25.25], [56.6, 24.3]],
                         action: {
-                            fr: 'Activation Gate-to-Gate 6 GHz U-NII-5 + AFC U-NII-7',
-                            en: 'Gate-to-Gate 6 GHz U-NII-5 + AFC U-NII-7 enabled'
+                            fr: 'Départ DXB : 6 GHz U-NII-5 Gate-to-Gate + U-NII-1/3 + 60 GHz IFE actifs • ISM 2.4G coupé (BT)',
+                            en: 'DXB Departure: Gate-to-Gate 6 GHz U-NII-5 + U-NII-1/3 + 60 GHz IFE active • 2.4G ISM muted (BT)'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'Océan Indien & FIR Singapour (APT)', en: 'Indian Ocean & Singapore FIR (APT)' },
+                        icao: 'OOMM',
+                        fir: { fr: 'FIR Muscat (OOMM)', en: 'Muscat FIR (OOMM)' },
+                        auth: 'TRA / CAA (Oman - ASMG)',
+                        coords: [[56.6, 24.3], [60.0, 20.5], [63.5, 16.5]],
                         action: {
-                            fr: 'Continuité totale sur 6 GHz Bas (Ch 33 & Ch 65 en 320 MHz)',
-                            en: 'Full seamless handover on 6 GHz Low (Ch 33 & Ch 65 at 320 MHz)'
+                            fr: 'Survol Oman & Mer d’Arabie : Harmonisation ASMG sur U-NII-5 (320 MHz) + U-NII-7 AFC',
+                            en: 'Oman & Arabian Sea transit: ASMG harmonization on U-NII-5 (320 MHz) + U-NII-7 AFC'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'FIR Melbourne / Sydney (ACMA)', en: 'Melbourne / Sydney FIR (ACMA)' },
+                        icao: 'VABF',
+                        fir: { fr: 'FIR Mumbai Oceanic (VABF)', en: 'Mumbai Oceanic FIR (VABF)' },
+                        auth: 'WPC / DGCA (Inde)',
+                        coords: [[63.5, 16.5], [69.0, 11.5], [73.0, 7.5]],
                         action: {
-                            fr: 'Maintien U-NII-5 et U-NII-3 jusqu’à l’arrivée au bloc à Sydney',
-                            en: 'Retain U-NII-5 and U-NII-3 down to gate arrival in Sydney'
+                            fr: 'Entrée FIR Mumbai : Maintien 6 GHz Bas U-NII-5 (LPI) + 5 GHz U-NII-1/3 • Coupure U-NII-7',
+                            en: 'Mumbai FIR Entry: Retain Lower 6 GHz U-NII-5 (LPI) + 5 GHz U-NII-1/3 • U-NII-7 muted'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'VRMF',
+                        fir: { fr: 'FIR Malé (VRMF)', en: 'Male FIR (VRMF)' },
+                        auth: 'CAM / MCAA (Maldives - APT)',
+                        coords: [[73.0, 7.5], [76.5, 4.0], [80.0, 0.5]],
+                        action: {
+                            fr: 'Passage Équateur Océan Indien : Continuité APT sur 6 GHz U-NII-5 (320 MHz) & 5 GHz',
+                            en: 'Indian Ocean Equator crossing: APT continuity on 6 GHz U-NII-5 (320 MHz) & 5 GHz'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'VCCF',
+                        fir: { fr: 'FIR Colombo (VCCF)', en: 'Colombo FIR (VCCF)' },
+                        auth: 'TRCSL / CAASL (Sri Lanka)',
+                        coords: [[80.0, 0.5], [84.5, -3.5]],
+                        action: {
+                            fr: 'Secteur Sud Colombo : Canaux 320 MHz U-NII-5 (Ch 33 & 65) + U-NII-1/3 pleinement actifs',
+                            en: 'Colombo South Sector: 320 MHz U-NII-5 channels (Ch 33 & 65) + U-NII-1/3 fully active'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'WIIF',
+                        fir: { fr: 'FIR Jakarta Oceanic (WIIF)', en: 'Jakarta Oceanic FIR (WIIF)' },
+                        auth: 'SDPPI / DGCA (Indonésie)',
+                        coords: [[84.5, -3.5], [91.0, -8.5], [97.0, -12.0]],
+                        action: {
+                            fr: 'Océan Indien Est : Conformité SDPPI 6 GHz LPI (U-NII-5) + 5 GHz U-NII-1/3',
+                            en: 'East Indian Ocean: SDPPI compliance on 6 GHz LPI (U-NII-5) + 5 GHz U-NII-1/3'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'YMMM-OCA',
+                        fir: { fr: 'FIR Melbourne Oceanic (YMMM)', en: 'Melbourne Oceanic FIR (YMMM)' },
+                        auth: 'ACMA / CASA (Australie Océanique)',
+                        coords: [[97.0, -12.0], [106.0, -17.5], [114.5, -22.5]],
+                        action: {
+                            fr: 'Entrée espace australien : Activation U-NII-5 + U-NII-7 (>FL150 via AFC ACMA)',
+                            en: 'Australian airspace entry: U-NII-5 + U-NII-7 (>FL150 via ACMA AFC) enabled'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'YMMM',
+                        fir: { fr: 'FIR Melbourne Continental (YMMM)', en: 'Melbourne Continental FIR (YMMM)' },
+                        auth: 'ACMA / CASA (Australie)',
+                        coords: [[114.5, -22.5], [128.0, -28.0], [141.0, -32.2]],
+                        action: {
+                            fr: 'Traversée continentale Australie : 6 GHz U-NII-5 (200 mW LPI) + 5 GHz U-NII-1/3',
+                            en: 'Australian continental transit: 6 GHz U-NII-5 (200 mW LPI) + 5 GHz U-NII-1/3'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'YBBB',
+                        fir: { fr: 'FIR Brisbane / Sydney TMA (YBBB)', en: 'Brisbane FIR / Sydney TMA (YBBB)' },
+                        auth: 'ACMA / CASA (Australie)',
+                        coords: [[141.0, -32.2], [147.0, -33.4], [151.17, -33.94]],
+                        action: {
+                            fr: 'Atterrissage Sydney (YSSY) : Coupure U-NII-2/7 sous FL100 • Maintien U-NII-5 & U-NII-1/3 jusqu’à la porte',
+                            en: 'Sydney (YSSY) Landing: Mute U-NII-2/7 below FL100 • Retain U-NII-5 & U-NII-1/3 to the gate'
                         },
                         status: 'ALLOWED'
                     }
@@ -1051,29 +1396,103 @@
             },
             'GRU-MAD': {
                 name: { fr: 'IB6824 : São Paulo (GRU) ➔ Madrid (MAD)', en: 'IB6824: São Paulo (GRU) ➔ Madrid (MAD)' },
-                coords: [[-46.47, -23.43], [-35.20, -5.79], [-17.44, 14.69], [-15.4, 28.0], [-3.56, 40.47]],
                 steps: [
                     {
-                        fir: { fr: 'FIR Curitiba / Recife (ANATEL)', en: 'Curitiba / Recife FIR (ANATEL)' },
+                        icao: 'SBCW',
+                        fir: { fr: 'FIR Curitiba (SBCW)', en: 'Curitiba FIR (SBCW)' },
+                        auth: 'ANATEL / ANAC (Brésil)',
+                        coords: [[-46.47, -23.43], [-44.0, -20.5]],
                         action: {
-                            fr: 'Spectre complet 6 GHz (5925–7125 MHz) autorisé dès l’embarquement',
-                            en: 'Full 6 GHz spectrum (5925–7125 MHz) authorized from boarding'
+                            fr: 'Départ GRU : Spectre complet 6 GHz ANATEL (5925–7125 MHz) + 5 GHz actifs • ISM 2.4G coupé (BT)',
+                            en: 'GRU Departure: Full ANATEL 6 GHz spectrum (5925–7125 MHz) + 5 GHz active • 2.4G ISM muted (BT)'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'FIR Dakar / Atlantique Sud (ATU)', en: 'Dakar FIR / South Atlantic (ATU)' },
+                        icao: 'SBBS',
+                        fir: { fr: 'FIR Brasília (SBBS)', en: 'Brasilia FIR (SBBS)' },
+                        auth: 'ANATEL / ANAC (Brésil)',
+                        coords: [[-44.0, -20.5], [-40.5, -15.0]],
                         action: {
-                            fr: 'Bascule automatique sur U-NII-5 uniquement (6425–7125 MHz coupé)',
-                            en: 'Automated fallback to U-NII-5 only (6425–7125 MHz muted)'
+                            fr: 'Croisière Brésil : 2x 320 MHz sur 6 GHz (U-NII-5 à 8) + U-NII-1/3 (500 mW)',
+                            en: 'Brazil Cruise: 2x 320 MHz on 6 GHz (U-NII-5 to 8) + U-NII-1/3 (500 mW)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'SBAO-REC',
+                        fir: { fr: 'FIR Recife Continental (SBAO)', en: 'Recife Continental FIR (SBAO)' },
+                        auth: 'ANATEL / ANAC (Brésil)',
+                        coords: [[-40.5, -15.0], [-35.0, -6.5]],
+                        action: {
+                            fr: 'Survol Nordeste : Pleine capacité Wi-Fi 8 en bande 6 GHz LPI (250 mW)',
+                            en: 'Nordeste transit: Full Wi-Fi 8 throughput in 6 GHz LPI band (250 mW)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'SBAO',
+                        fir: { fr: 'FIR Atlántico (SBAO Oceanic)', en: 'Atlantico FIR (SBAO Oceanic)' },
+                        auth: 'DECEA / OACI (Atlantique Sud)',
+                        coords: [[-35.0, -6.5], [-30.5, 0.0], [-26.0, 6.5]],
+                        action: {
+                            fr: 'Corridor EUR-SAM Océanique : Spectre haute mer 5 GHz & 6 GHz complet sans restriction',
+                            en: 'EUR-SAM Oceanic Corridor: Full 5 GHz & 6 GHz high-seas spectrum without restriction'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'GOOO',
+                        fir: { fr: 'FIR Dakar Oceanic (GOOO)', en: 'Dakar Oceanic FIR (GOOO)' },
+                        auth: 'ARTP / ASECNA (Sénégal - ATU)',
+                        coords: [[-26.0, 6.5], [-23.5, 13.5]],
+                        action: {
+                            fr: 'Entrée zone ATU : Coupure 6 GHz Haut (6425–7125 MHz) ➔ Maintien 6 GHz Bas U-NII-5 & 5 GHz U-NII-1',
+                            en: 'ATU Zone Entry: Cutoff of Upper 6 GHz (6425–7125 MHz) ➔ Retain Lower 6 GHz U-NII-5 & 5 GHz U-NII-1'
                         },
                         status: 'CONDITIONAL'
                     },
                     {
-                        fir: { fr: 'FIR Madrid (EASA / CEPT)', en: 'Madrid FIR (EASA / CEPT)' },
+                        icao: 'GVSC',
+                        fir: { fr: 'FIR Sal Oceanic (GVSC)', en: 'Sal Oceanic FIR (GVSC)' },
+                        auth: 'ARME / AAC (Cap-Vert - ATU)',
+                        coords: [[-23.5, 13.5], [-19.5, 22.5]],
                         action: {
-                            fr: 'Maintien U-NII-5 (5945–6425 MHz) jusqu’au débarquement à Barajas',
-                            en: 'U-NII-5 (5945–6425 MHz) maintained until Barajas disembarkation'
+                            fr: 'Survol archipel Cap-Vert : U-NII-5 (5945–6425 MHz, 200 mW) + U-NII-1 (Ch 36–48) actifs',
+                            en: 'Cape Verde archipelago transit: U-NII-5 (5945–6425 MHz, 200 mW) + U-NII-1 (Ch 36–48) active'
+                        },
+                        status: 'CONDITIONAL'
+                    },
+                    {
+                        icao: 'GCCC',
+                        fir: { fr: 'FIR Canarias (GCCC)', en: 'Canary Islands FIR (GCCC)' },
+                        auth: 'CNMC / EASA (Espagne - UE)',
+                        coords: [[-19.5, 22.5], [-15.4, 28.0], [-12.0, 32.5]],
+                        action: {
+                            fr: 'Entrée espace UE (Canaries) : Interdiction stricte Ch 52–144 (UE 2029) • Cabine sur U-NII-5 & U-NII-1',
+                            en: 'EU Airspace Entry (Canaries): Strict ban on Ch 52–144 (EU 2029) • Cabin on U-NII-5 & U-NII-1'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'LPPC',
+                        fir: { fr: 'FIR Lisboa (LPPC)', en: 'Lisbon FIR (LPPC)' },
+                        auth: 'ANACOM / EASA (Portugal - UE)',
+                        coords: [[-12.0, 32.5], [-9.0, 37.0], [-7.0, 39.0]],
+                        action: {
+                            fr: 'Entrée péninsule Ibérique : U-NII-5 LPI (320 MHz) + U-NII-1 (Ch 36–48) • Ch 52–144 verrouillés OFF',
+                            en: 'Iberian Peninsula Entry: U-NII-5 LPI (320 MHz) + U-NII-1 (Ch 36–48) • Ch 52–144 locked OFF'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'LECM',
+                        fir: { fr: 'FIR Madrid (LECM)', en: 'Madrid FIR (LECM)' },
+                        auth: 'CNMC / EASA (Espagne - UE)',
+                        coords: [[-7.0, 39.0], [-3.56, 40.47]],
+                        action: {
+                            fr: 'Approche & Arrivée Barajas (LEMD) : Continuité Gate-to-Gate sur 6 GHz U-NII-5 & 5 GHz Ch 36–48',
+                            en: 'Barajas (LEMD) Approach & Arrival: Gate-to-Gate continuity on 6 GHz U-NII-5 & 5 GHz Ch 36–48'
                         },
                         status: 'ALLOWED'
                     }
@@ -1081,29 +1500,92 @@
             },
             'LAX-SIN': {
                 name: { fr: 'SQ37 : Los Angeles (LAX) ➔ Singapour (SIN)', en: 'SQ37: Los Angeles (LAX) ➔ Singapore (SIN)' },
-                coords: [[-118.40, 33.94], [-157.85, 21.30], [144.79, 13.44], [121.0, 14.5], [103.99, 1.36]],
                 steps: [
                     {
-                        fir: { fr: 'FIR Los Angeles & Oakland (FCC)', en: 'Los Angeles & Oakland FIR (FCC)' },
+                        icao: 'KZLA',
+                        fir: { fr: 'FIR Los Angeles (KZLA)', en: 'Los Angeles FIR (KZLA)' },
+                        auth: 'FCC Part 15E (USA)',
+                        coords: [[-118.40, 33.94], [-123.0, 36.2]],
                         action: {
-                            fr: 'Spectre maximal 2.4 / 5 / 6 GHz complet (1200 MHz en 6 GHz)',
-                            en: 'Maximum 2.4 / 5 / 6 GHz complete spectrum (1200 MHz on 6 GHz)'
+                            fr: 'Départ LAX : Spectre complet 6 GHz (5925–7125 MHz) + 5 GHz U-NII-1/3 • ISM 2.4G coupé (BT)',
+                            en: 'LAX Departure: Full 6 GHz spectrum (5925–7125 MHz) + 5 GHz U-NII-1/3 • 2.4G ISM muted (BT)'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'Pacifique Sud & FIR Manille (APT)', en: 'South Pacific & Manila FIR (APT)' },
+                        icao: 'KZOA',
+                        fir: { fr: 'FIR Oakland Oceanic (KZOA)', en: 'Oakland Oceanic FIR (KZOA)' },
+                        auth: 'FCC Part 15E / FAA (USA)',
+                        coords: [[-123.0, 36.2], [-140.0, 42.5], [-155.0, 46.5]],
                         action: {
-                            fr: 'Transition transparente vers profil APT (U-NII-5 + U-NII-3)',
-                            en: 'Seamless transition to APT profile (U-NII-5 + U-NII-3)'
+                            fr: 'Pacifique Nord-Est : Pleine puissance LPI 6 GHz (canaux 320 MHz Ch 33, 65, 145, 177) + 60 GHz',
+                            en: 'North-East Pacific: Full 6 GHz LPI capacity (320 MHz Ch 33, 65, 145, 177) + 60 GHz'
                         },
                         status: 'ALLOWED'
                     },
                     {
-                        fir: { fr: 'FIR Singapour (IMDA)', en: 'Singapore FIR (IMDA)' },
+                        icao: 'PAZA',
+                        fir: { fr: 'FIR Anchorage Oceanic (PAZA)', en: 'Anchorage Oceanic FIR (PAZA)' },
+                        auth: 'FCC Part 15E / FAA (USA)',
+                        coords: [[-155.0, 46.5], [-168.0, 48.2], [-179.8, 47.5]],
                         action: {
-                            fr: 'Approche Changi : U-NII-5 (320 MHz) + U-NII-1/3 maintenus Gate-to-Gate',
-                            en: 'Changi Approach: U-NII-5 (320 MHz) + U-NII-1/3 maintained Gate-to-Gate'
+                            fr: 'Corridor Aléoutiennes jusqu’à la ligne de changement de date (180°) : Spectre FCC complet',
+                            en: 'Aleutian corridor up to International Date Line (180°): Full FCC spectrum active'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'RJJJ',
+                        fir: { fr: 'FIR Fukuoka Oceanic & NOPAC (RJJJ)', en: 'Fukuoka Oceanic & NOPAC FIR (RJJJ)' },
+                        auth: 'MIC / JCAB (Japon)',
+                        coords: [[179.8, 47.5], [162.0, 43.0], [145.0, 35.5], [128.0, 26.5]],
+                        action: {
+                            fr: 'Entrée FIR Fukuoka (Pacifique Nord-Ouest & Okinawa) : Bascule profil MIC Japon (U-NII-5 320 MHz + U-NII-1/3 >FL100)',
+                            en: 'Fukuoka FIR Entry (NW Pacific & Okinawa): Switch to Japan MIC profile (U-NII-5 320 MHz + U-NII-1/3 >FL100)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'RCAA',
+                        fir: { fr: 'FIR Taipei (RCAA)', en: 'Taipei FIR (RCAA)' },
+                        auth: 'NCC / CAA (Taïwan - APT)',
+                        coords: [[128.0, 26.5], [123.5, 23.5], [120.0, 21.0]],
+                        action: {
+                            fr: 'Transit FIR Taipei : 6 GHz Bas U-NII-5 (5945–6425 MHz) + 5 GHz U-NII-1 & U-NII-3 actifs',
+                            en: 'Taipei FIR transit: Lower 6 GHz U-NII-5 (5945–6425 MHz) + 5 GHz U-NII-1 & U-NII-3 active'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'RPHI',
+                        fir: { fr: 'FIR Manila / Manille (RPHI)', en: 'Manila FIR (RPHI)' },
+                        auth: 'NTC / CAAP (Philippines - APT)',
+                        coords: [[120.0, 21.0], [116.5, 16.5], [114.0, 13.0]],
+                        action: {
+                            fr: 'Survol Mer de Chine Méridionale (FIR Manille) : Maintien U-NII-5 LPI + U-NII-1/3 (250 mW)',
+                            en: 'South China Sea transit (Manila FIR): Retain U-NII-5 LPI + U-NII-1/3 (250 mW)'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'VVHM',
+                        fir: { fr: 'FIR Ho Chi Minh (VVHM)', en: 'Ho Chi Minh FIR (VVHM)' },
+                        auth: 'ARFM / CAAV (Viêt Nam - APT)',
+                        coords: [[114.0, 13.0], [110.5, 9.5], [107.5, 6.5]],
+                        action: {
+                            fr: 'Secteur Océanique Ho Chi Minh : Continuité sur 6 GHz U-NII-5 (Ch 33/65) & 5 GHz U-NII-1/3',
+                            en: 'Ho Chi Minh Oceanic Sector: Continuity on 6 GHz U-NII-5 (Ch 33/65) & 5 GHz U-NII-1/3'
+                        },
+                        status: 'ALLOWED'
+                    },
+                    {
+                        icao: 'WSJC',
+                        fir: { fr: 'FIR Singapore (WSJC)', en: 'Singapore FIR (WSJC)' },
+                        auth: 'IMDA / CAAS (Singapour)',
+                        coords: [[107.5, 6.5], [103.99, 1.36]],
+                        action: {
+                            fr: 'Approche & Arrivée Changi (WSSS) : U-NII-5 (320 MHz) + U-NII-1/3 autorisés jusqu’au débarquement',
+                            en: 'Changi (WSSS) Approach & Arrival: U-NII-5 (320 MHz) + U-NII-1/3 authorized until disembarkation'
                         },
                         status: 'ALLOWED'
                     }
@@ -1117,18 +1599,20 @@
         let currentState = {
             lang: 'fr',                   // 'fr' ou 'en'
             flightPhase: 'cruise',        // 'cruise' ou 'ground'
-            selectedBand: 'ALL',          // 'ALL', '2.4G', 'UNII-1', etc.
+            selectedBand: 'NO_ISM',       // 'NO_ISM' (Toutes sauf ISM), '2.4G', 'UNII-1', etc.
             selectedChannel: null,        // { bandId, ch, label }
             selectedCountryName: 'France',
-            activeRoute: 'none',
-            highlightedBw: 20
+            activeRoute: 'CDG-HND',       // Route officielle active par défaut pour visualiser les FIR
+            highlightedBw: 20,
+            disableIsmBt: true,           // Désactivation totale des bandes ISM communes au Bluetooth (saturation cabine)
+            hoveredFirIcao: null          // Code OACI de la FIR survolée
         };
 
         let svgMap, gMap, projection, pathGenerator, zoomBehavior;
         let worldCountriesFeatures = [];
 
         /***********************************************************************
-         * 3. GESTION DE LA LANGUE (FR / EN)
+         * 3. GESTION DE LA LANGUE (FR / EN) & BOUTON SATURATION BLUETOOTH ISM
          ***********************************************************************/
         function setLanguage(lang) {
             currentState.lang = lang;
@@ -1161,6 +1645,7 @@
             // Filtres & Boutons de bandes
             document.getElementById('ui-filter-title').textContent = t.filterTitle;
             document.getElementById('ui-btn-reset').textContent = t.btnReset;
+            document.getElementById('btn-band-all-tag').textContent = t.bandAllTag;
             document.getElementById('btn-band-all-title').textContent = t.bandAllTitle;
             document.getElementById('btn-band-all-sub').textContent = t.bandAllSub;
             document.getElementById('btn-band-24-title').textContent = t.band24Title;
@@ -1198,7 +1683,8 @@
             document.getElementById('ui-footer-text').textContent = t.footerText;
             document.getElementById('ui-footer-standard').textContent = t.footerStandard;
 
-            // 3. Re-génération des listes dynamiques (Sélecteur de route, badge de filtre, analyseur, inspecteur)
+            // 3. Re-génération des listes dynamiques
+            updateBtIsmButtonUI();
             populateRouteSelectorOptions();
             updateActiveFilterBadge();
             updateInspectorPanel(currentState.selectedCountryName);
@@ -1206,9 +1692,40 @@
             updateMapColors();
         }
 
+        function toggleIsmBluetoothMute() {
+            currentState.disableIsmBt = !currentState.disableIsmBt;
+            updateBtIsmButtonUI();
+            updateMapColors();
+            updateInspectorPanel(currentState.selectedCountryName);
+            renderHandoverTimeline();
+        }
+
+        function updateBtIsmButtonUI() {
+            const t = TRANSLATIONS[currentState.lang];
+            const btn = document.getElementById('bt-ism-toggle');
+            const label = document.getElementById('ui-bt-ism-label');
+            const sub24 = document.getElementById('btn-band-24-sub');
+
+            if (currentState.disableIsmBt) {
+                btn.className = 'text-xs font-mono px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30';
+                label.textContent = t.btIsmOn;
+                if (sub24) {
+                    sub24.textContent = t.band24SubMuted;
+                    sub24.className = 'text-[10px] text-rose-400 font-mono';
+                }
+            } else {
+                btn.className = 'text-xs font-mono px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 bg-slate-800/80 text-slate-400 border border-slate-700 hover:text-slate-200';
+                label.textContent = t.btIsmOff;
+                if (sub24) {
+                    sub24.textContent = t.band24SubActive;
+                    sub24.className = 'text-[10px] text-emerald-400 font-mono';
+                }
+            }
+        }
+
         function populateRouteSelectorOptions() {
             const selector = document.getElementById('route-selector');
-            const curVal = selector.value || currentState.activeRoute || 'none';
+            const curVal = currentState.activeRoute || 'CDG-HND';
             const t = TRANSLATIONS[currentState.lang];
 
             let html = `<option value="none" class="bg-slate-900">${t.noActiveRoute}</option>`;
@@ -1225,7 +1742,7 @@
 
             if (currentState.selectedChannel) {
                 badge.textContent = `${t.filterActiveChannel}${currentState.selectedChannel.label}`;
-            } else if (currentState.selectedBand !== 'ALL') {
+            } else if (currentState.selectedBand !== 'NO_ISM') {
                 const bandObj = BANDS_CATALOG.find(b => b.id === currentState.selectedBand);
                 const bandName = bandObj ? (bandObj.name[currentState.lang] || bandObj.name.fr) : currentState.selectedBand;
                 badge.textContent = `${t.filterActiveBand}${bandName}`;
@@ -1276,11 +1793,20 @@
             const prof = info.profile;
             const phase = currentState.flightPhase;
             const isEn = currentState.lang === 'en';
+            const t = TRANSLATIONS[currentState.lang];
 
             // Si un canal spécifique est sélectionné
             if (currentState.selectedChannel) {
                 const bandId = currentState.selectedChannel.bandId;
                 const chId = currentState.selectedChannel.ch;
+
+                // Si la bande 2.4G ISM est coupée à cause de la saturation Bluetooth cabine
+                if (bandId === '2.4G' && currentState.disableIsmBt) {
+                    return {
+                        status: 'FORBIDDEN',
+                        label: t.ismMutedDetail
+                    };
+                }
 
                 // Application stricte Décision (UE) 2022/179
                 if (bandId === 'UNII-2' && info.profileKey === 'CEPT_EU') {
@@ -1341,7 +1867,13 @@
             }
 
             // Si une bande spécifique est sélectionnée
-            if (currentState.selectedBand !== 'ALL') {
+            if (currentState.selectedBand !== 'NO_ISM') {
+                if (currentState.selectedBand === '2.4G' && currentState.disableIsmBt) {
+                    return {
+                        status: 'FORBIDDEN',
+                        label: t.ismMutedDetail
+                    };
+                }
                 const bandRule = prof.bands[currentState.selectedBand];
                 const detailText = bandRule.detail[currentState.lang] || bandRule.detail.fr;
                 return {
@@ -1350,23 +1882,23 @@
                 };
             }
 
-            // Vue globale
+            // Vue "Toutes bandes sauf ISM (Bluetooth)" : évaluation sur 5 GHz, 6 GHz et 60 GHz uniquement
             const u5 = prof.bands['UNII-5'][phase];
             const u7 = prof.bands['UNII-7'][phase];
             if (u5 === 'ALLOWED' && (u7 === 'ALLOWED' || u7 === 'CONDITIONAL')) {
                 return {
                     status: 'ALLOWED',
-                    label: isEn ? `Score ${prof.score}% • 2.4G / 5G / 6G (${prof.maxBw})` : `Indice ${prof.score}% • 2.4G / 5G / 6G (${prof.maxBw})`
+                    label: isEn ? `Score ${prof.score}% (No ISM) • 5G / 6G / 60G (${prof.maxBw})` : `Indice ${prof.score}% (Hors ISM) • 5G / 6G / 60G (${prof.maxBw})`
                 };
             } else if (u5 === 'ALLOWED' || u5 === 'CONDITIONAL') {
                 return {
                     status: 'CONDITIONAL',
-                    label: isEn ? `Score ${prof.score}% • Partial or conditional 6 GHz` : `Indice ${prof.score}% • 6 GHz partiel ou conditionnel`
+                    label: isEn ? `Score ${prof.score}% (No ISM) • 5G active, conditional 6 GHz` : `Indice ${prof.score}% (Hors ISM) • 5G actif, 6 GHz partiel/conditionnel`
                 };
             }
             return {
-                status: 'FORBIDDEN',
-                label: isEn ? `Score ${prof.score}% • 6 GHz restricted on ground` : `Indice ${prof.score}% • 6 GHz restreint au sol`
+                status: 'CONDITIONAL',
+                label: isEn ? `Score ${prof.score}% (No ISM) • 5G U-NII-1/3 only (6 GHz restricted)` : `Indice ${prof.score}% (Hors ISM) • 5G U-NII-1/3 seul (6 GHz restreint)`
             };
         }
 
@@ -1528,7 +2060,8 @@
 
             BANDS_CATALOG.forEach(band => {
                 const bandRule = prof.bands[band.id];
-                const bandStatus = bandRule[phase];
+                const isIsmMuted = (band.id === '2.4G' && currentState.disableIsmBt);
+                const bandStatus = isIsmMuted ? 'FORBIDDEN' : bandRule[phase];
                 const isBandSelected = currentState.selectedBand === band.id;
                 const bandTitle = band.name[currentState.lang] || band.name.fr;
 
@@ -1536,18 +2069,22 @@
                     ? 'bg-emerald-400'
                     : bandStatus === 'CONDITIONAL' ? 'bg-amber-400' : 'bg-rose-500';
 
+                const rightHeaderInfo = isIsmMuted
+                    ? `<span class="text-amber-300 font-semibold"><i class="fa-brands fa-bluetooth-b mr-1"></i>${t.badgeMutedBt}</span>`
+                    : `<span class="text-slate-300">${countryInfo.displayName} :</span> ${bandRule.eirp}`;
+
                 html += `
-                <div class="bg-slate-950/80 border ${isBandSelected ? 'border-cyan-400/70' : 'border-slate-800/80'} rounded-xl p-2.5 transition-all">
+                <div class="bg-slate-950/80 border ${isBandSelected ? 'border-cyan-400/70' : 'border-slate-800/80'} ${isIsmMuted ? 'opacity-65' : ''} rounded-xl p-2.5 transition-all">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="w-2.5 h-2.5 rounded-full ${statusDot}"></span>
-                            <button onclick="setBandFilter('${band.id}')" class="text-xs font-bold text-white hover:text-cyan-300 transition-colors">
+                            <button onclick="setBandFilter('${band.id}')" class="text-xs font-bold text-white hover:text-cyan-300 transition-colors ${isIsmMuted ? 'line-through text-slate-400' : ''}">
                                 ${bandTitle}
                             </button>
                             <span class="text-[11px] font-mono text-slate-400">${band.range}</span>
                         </div>
                         <div class="text-[11px] font-mono text-slate-400">
-                            <span class="text-slate-300">${countryInfo.displayName} :</span> ${bandRule.eirp}
+                            ${rightHeaderInfo}
                         </div>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5">
@@ -1563,7 +2100,7 @@
                                     chStatus = 'FORBIDDEN';
                                 }
                             }
-                            if (band.id === '2.4G' && c.ch === 13 && countryInfo.profileKey === 'FCC_NA') {
+                            if (band.id === '2.4G' && !isIsmMuted && c.ch === 13 && countryInfo.profileKey === 'FCC_NA') {
                                 chStatus = 'CONDITIONAL';
                             }
                             if (band.id === 'UNII-2' && c.tdwr && (phase === 'ground' || countryInfo.profileKey === 'CAAC_CN' || countryInfo.profileKey === 'RCC_EURASIA')) {
@@ -1584,14 +2121,15 @@
                             const isMiitExcluded = (band.id === 'UNII-2' && countryInfo.profileKey === 'CAAC_CN' && typeof c.ch === 'number' && c.ch >= 100);
 
                             let badgeLabel = c.bw >= 1000 ? '2.1G' : c.bw + 'M';
-                            if (isEuBanned) badgeLabel = currentState.lang === 'en' ? 'EU-BAN' : 'BAN-UE';
+                            if (isIsmMuted) badgeLabel = 'BT-SAT';
+                            else if (isEuBanned) badgeLabel = currentState.lang === 'en' ? 'EU-BAN' : 'BAN-UE';
                             else if (isMiitExcluded) badgeLabel = 'NON-MIIT';
 
                             return `
                                 <button onclick="selectSpecificChannel('${band.id}', '${c.ch}', '${displayLabel} (${c.freq} MHz)')"
                                     class="channel-pill ${isSelectedCh ? 'active-filter ring-2 ring-cyan-400' : ''} ${bwHighlight} ${colorClasses} border rounded-lg px-2 py-1.5 text-left flex flex-col justify-between">
                                     <div class="flex items-center justify-between w-full">
-                                        <span class="font-mono text-xs font-bold ${(isEuBanned || isMiitExcluded) ? 'line-through text-rose-400' : ''}">${displayLabel}</span>
+                                        <span class="font-mono text-xs font-bold ${(isEuBanned || isMiitExcluded || isIsmMuted) ? 'line-through text-rose-400' : ''}">${displayLabel}</span>
                                         <span class="text-[9px] font-mono px-1 rounded bg-slate-950/60">${badgeLabel}</span>
                                     </div>
                                     <div class="text-[10px] font-mono opacity-80 mt-0.5">${c.freq} MHz</div>
@@ -1630,25 +2168,29 @@
             const bandsListEl = document.getElementById('inspector-bands-list');
             bandsListEl.innerHTML = BANDS_CATALOG.map(band => {
                 const rule = prof.bands[band.id];
-                const status = rule[phase];
+                const isIsmMuted = (band.id === '2.4G' && currentState.disableIsmBt);
+                const status = isIsmMuted ? 'FORBIDDEN' : rule[phase];
                 const bandTitle = band.name[currentState.lang] || band.name.fr;
-                const detailText = rule.detail[currentState.lang] || rule.detail.fr;
+                const detailText = isIsmMuted ? t.ismMutedDetail : (rule.detail[currentState.lang] || rule.detail.fr);
+                const eirpText = isIsmMuted ? '0 mW (ONC Off)' : rule.eirp;
 
-                const badge = status === 'ALLOWED'
-                    ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">${t.badgeAllowed}</span>`
-                    : status === 'CONDITIONAL'
-                        ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">${t.badgeConditional}</span>`
-                        : `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">${t.badgeForbidden}</span>`;
+                const badge = isIsmMuted
+                    ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40"><i class="fa-brands fa-bluetooth-b mr-1"></i>${t.badgeMutedBt}</span>`
+                    : status === 'ALLOWED'
+                        ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">${t.badgeAllowed}</span>`
+                        : status === 'CONDITIONAL'
+                            ? `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">${t.badgeConditional}</span>`
+                            : `<span class="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">${t.badgeForbidden}</span>`;
 
                 return `
-                    <div onclick="setBandFilter('${band.id}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-3 transition-all">
+                    <div onclick="setBandFilter('${band.id}')" class="cursor-pointer bg-slate-950/70 hover:bg-slate-900 border border-slate-800/90 rounded-xl p-3 transition-all ${isIsmMuted ? 'opacity-70' : ''}">
                         <div class="flex items-center justify-between gap-2">
-                            <div class="font-semibold text-xs text-white">${bandTitle}</div>
+                            <div class="font-semibold text-xs text-white ${isIsmMuted ? 'line-through text-slate-400' : ''}">${bandTitle}</div>
                             ${badge}
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-cyan-400 mt-1">
                             <span>${band.range}</span>
-                            <span>${t.eirpLabel} ${rule.eirp}</span>
+                            <span>${t.eirpLabel} ${eirpText}</span>
                         </div>
                         <p class="text-[11px] text-slate-400 mt-1">${detailText}</p>
                     </div>
@@ -1691,7 +2233,7 @@
         }
 
         function resetChannelFilter() {
-            setBandFilter('ALL');
+            setBandFilter('NO_ISM');
         }
 
         function setFlightPhase(phase) {
@@ -1726,12 +2268,31 @@
         }
 
         /***********************************************************************
-         * 9. SIMULATEUR DE CORRIDOR AÉRIEN
+         * 9. SIMULATEUR DE CORRIDOR AÉRIEN & SURVOL FIR INTERACTIF
          ***********************************************************************/
         function selectFlightRoute(routeKey) {
             currentState.activeRoute = routeKey;
             renderFlightRouteOverlay();
             renderHandoverTimeline();
+        }
+
+        function highlightFirSegment(icao, highlight) {
+            currentState.hoveredFirIcao = highlight ? icao : null;
+            if (!gMap) return;
+
+            gMap.selectAll('.fir-visible-segment')
+                .attr('stroke', d => (highlight && d.icao === icao) ? '#fde047' : '#00f0ff')
+                .attr('stroke-width', d => (highlight && d.icao === icao) ? 3.8 : 2.2);
+
+            document.querySelectorAll('.fir-timeline-card').forEach(el => {
+                if (highlight && el.dataset.icao === icao) {
+                    el.classList.add('border-yellow-400', 'bg-slate-900');
+                    el.classList.remove('border-cyan-500/30', 'border-slate-800/80');
+                } else {
+                    el.classList.remove('border-yellow-400', 'bg-slate-900');
+                    el.classList.add(currentState.activeRoute !== 'none' ? 'border-cyan-500/30' : 'border-slate-800/80');
+                }
+            });
         }
 
         function renderFlightRouteOverlay() {
@@ -1742,45 +2303,120 @@
 
             const route = FLIGHT_ROUTES[currentState.activeRoute];
             const routeGroup = gMap.append('g').attr('class', 'route-layer');
+            const tooltip = document.getElementById('map-tooltip');
+            const totalSteps = route.steps.length;
 
-            const lineGeoJson = {
-                type: 'LineString',
-                coordinates: route.coords
-            };
+            // Dessiner chaque segment FIR individuellement pour permettre le survol interactif précis
+            route.steps.forEach((step, idx) => {
+                const lineGeoJson = {
+                    type: 'LineString',
+                    coordinates: step.coords,
+                    icao: step.icao,
+                    stepIndex: idx + 1
+                };
 
-            routeGroup.append('path')
-                .datum(lineGeoJson)
-                .attr('d', pathGenerator)
-                .attr('fill', 'none')
-                .attr('stroke', '#00f0ff')
-                .attr('stroke-width', 4)
-                .attr('stroke-opacity', 0.25);
+                // Halo externe du segment FIR
+                routeGroup.append('path')
+                    .datum(lineGeoJson)
+                    .attr('d', pathGenerator)
+                    .attr('fill', 'none')
+                    .attr('stroke', step.status === 'ALLOWED' ? '#00f0ff' : '#f59e0b')
+                    .attr('stroke-width', 5)
+                    .attr('stroke-opacity', 0.22)
+                    .attr('pointer-events', 'none');
 
-            routeGroup.append('path')
-                .datum(lineGeoJson)
-                .attr('class', 'flight-route-arc')
-                .attr('d', pathGenerator)
-                .attr('fill', 'none')
-                .attr('stroke', '#00f0ff')
-                .attr('stroke-width', 2);
+                // Ligne animée visible du segment FIR
+                routeGroup.append('path')
+                    .datum(lineGeoJson)
+                    .attr('class', 'flight-route-arc fir-visible-segment')
+                    .attr('d', pathGenerator)
+                    .attr('fill', 'none')
+                    .attr('stroke', '#00f0ff')
+                    .attr('stroke-width', 2.2)
+                    .attr('pointer-events', 'none');
 
-            routeGroup.selectAll('.waypoint-dot')
-                .data(route.coords)
-                .join('circle')
-                .attr('class', 'waypoint-dot')
-                .attr('cx', d => projection(d)[0])
-                .attr('cy', d => projection(d)[1])
-                .attr('r', 4)
-                .attr('fill', '#040814')
-                .attr('stroke', '#00f0ff')
-                .attr('stroke-width', 2);
+                // Zone de capture interactive élargie pour le survol à la souris
+                routeGroup.append('path')
+                    .datum(lineGeoJson)
+                    .attr('class', 'fir-segment-hit')
+                    .attr('d', pathGenerator)
+                    .attr('fill', 'none')
+                    .attr('stroke', 'transparent')
+                    .attr('stroke-width', 14)
+                    .on('mousemove', function(event) {
+                        event.stopPropagation();
+                        highlightFirSegment(step.icao, true);
+
+                        const firName = step.fir[currentState.lang] || step.fir.fr;
+                        const actionText = step.action[currentState.lang] || step.action.fr;
+                        const isEn = currentState.lang === 'en';
+
+                        document.getElementById('tt-country').textContent = firName;
+                        document.getElementById('tt-reg').textContent = `FIR ${idx + 1}/${totalSteps}`;
+
+                        const statusHtml = step.status === 'ALLOWED'
+                            ? `<span class="text-emerald-400">● ${step.auth}</span>`
+                            : `<span class="text-amber-400">▲ ${step.auth}</span>`;
+
+                        document.getElementById('tt-status').innerHTML = statusHtml;
+                        document.getElementById('tt-details').textContent = actionText;
+
+                        const [mx, my] = d3.pointer(event, document.getElementById('map-container'));
+                        tooltip.style.left = `${Math.min(mx + 16, document.getElementById('map-container').clientWidth - 250)}px`;
+                        tooltip.style.top = `${Math.max(my - 85, 12)}px`;
+                        tooltip.classList.remove('hidden');
+
+                        const cardEl = document.querySelector(`.fir-timeline-card[data-icao="${step.icao}"]`);
+                        if (cardEl) {
+                            cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    })
+                    .on('mouseleave', function() {
+                        highlightFirSegment(step.icao, false);
+                        tooltip.classList.add('hidden');
+                    });
+
+                // Point d'entrée de la FIR
+                const startPt = projection(step.coords[0]);
+                if (startPt) {
+                    routeGroup.append('circle')
+                        .attr('cx', startPt[0])
+                        .attr('cy', startPt[1])
+                        .attr('r', idx === 0 ? 4.5 : 3)
+                        .attr('fill', step.status === 'ALLOWED' ? '#10b981' : '#f59e0b')
+                        .attr('stroke', '#040814')
+                        .attr('stroke-width', 1.5)
+                        .attr('pointer-events', 'none');
+                }
+
+                // Point d'arrivée final du vol
+                if (idx === totalSteps - 1) {
+                    const endPt = projection(step.coords[step.coords.length - 1]);
+                    if (endPt) {
+                        routeGroup.append('circle')
+                            .attr('cx', endPt[0])
+                            .attr('cy', endPt[1])
+                            .attr('r', 4.5)
+                            .attr('fill', '#00f0ff')
+                            .attr('stroke', '#040814')
+                            .attr('stroke-width', 1.5)
+                            .attr('pointer-events', 'none');
+                    }
+                }
+            });
         }
 
         function renderHandoverTimeline() {
             const container = document.getElementById('flight-handover-timeline');
+            const countBadge = document.getElementById('fir-count-badge');
             const routeKey = currentState.activeRoute === 'none' ? 'CDG-HND' : currentState.activeRoute;
             const route = FLIGHT_ROUTES[routeKey];
             const isCustom = currentState.activeRoute !== 'none';
+            const t = TRANSLATIONS[currentState.lang];
+
+            if (countBadge) {
+                countBadge.textContent = `${route.steps.length} ${t.firCountSuffix}`;
+            }
 
             container.innerHTML = route.steps.map((s, idx) => {
                 const dotColor = s.status === 'ALLOWED' ? 'bg-emerald-400' : 'bg-amber-400';
@@ -1788,16 +2424,22 @@
                 const actionText = s.action[currentState.lang] || s.action.fr;
 
                 return `
-                    <div class="bg-slate-950/80 border ${isCustom ? 'border-cyan-500/30' : 'border-slate-800/80'} rounded-xl p-2.5 flex items-start gap-2.5">
+                    <div data-icao="${s.icao}"
+                        onmouseenter="highlightFirSegment('${s.icao}', true)"
+                        onmouseleave="highlightFirSegment('${s.icao}', false)"
+                        class="fir-timeline-card cursor-pointer bg-slate-950/80 border ${isCustom ? 'border-cyan-500/30' : 'border-slate-800/80'} rounded-xl p-2.5 flex items-start gap-2.5 transition-all">
                         <div class="w-5 h-5 rounded-full ${isCustom ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-300' : 'bg-slate-900 border border-slate-700 text-cyan-400'} flex items-center justify-center text-[10px] font-mono shrink-0 mt-0.5">
                             ${idx + 1}
                         </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full ${dotColor}"></span>
-                                <span class="font-semibold text-white text-xs">${firText}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 truncate">
+                                    <span class="w-2 h-2 rounded-full ${dotColor} shrink-0"></span>
+                                    <span class="font-semibold text-white text-xs truncate">${firText}</span>
+                                </div>
+                                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-cyan-300 border border-slate-800 shrink-0">${s.auth}</span>
                             </div>
-                            <p class="text-[11px] ${isCustom ? 'text-slate-300' : 'text-slate-400'} mt-0.5 font-mono">${actionText}</p>
+                            <p class="text-[11px] ${isCustom ? 'text-slate-300' : 'text-slate-400'} mt-1 font-mono leading-relaxed">${actionText}</p>
                         </div>
                     </div>
                 `;
