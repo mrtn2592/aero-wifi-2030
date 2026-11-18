@@ -1,0 +1,2129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aero WiFi 2030 — Réglementation Spectrale & Planificateur FIR</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #F8FAFC;
+            color: #0F172A;
+            overflow-x: hidden;
+        }
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+
+        /* Personnalisation Leaflet */
+        .leaflet-container {
+            background-color: #E2E8F0 !important;
+            font-family: 'Inter', sans-serif;
+        }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #FFFFFF !important;
+            color: #0F172A !important;
+            border: 1px solid #CBD5E1;
+            border-radius: 10px !important;
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15) !important;
+        }
+        .fir-label-tooltip {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border: 1px solid #38BDF8 !important;
+            color: #F8FAFC !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.18) !important;
+        }
+        .fir-label-tooltip::before {
+            display: none !important;
+        }
+        .wp-tooltip {
+            background: #0F172A !important;
+            border: 1px solid #0284C7 !important;
+            color: #FFFFFF !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 11px !important;
+            padding: 6px 10px !important;
+            border-radius: 6px !important;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25) !important;
+        }
+        .channel-pill {
+            transition: all 0.15s ease;
+        }
+        .channel-pill:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col select-none overflow-hidden text-slate-800">
+
+    <!-- ================= EN-TÊTE PRINCIPAL (LOGO AVION WIFI + 2 GRANDS ONGLETS + LANGUES) ================= -->
+    <header class="h-16 bg-slate-900 text-white px-6 flex items-center justify-between shrink-0 shadow-md z-30">
+        <!-- Logo SVG sur-mesure : Avion de ligne + Ondes Wi-Fi -->
+        <div class="flex items-center space-x-3.5">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-inner border border-sky-300/30">
+                <svg class="w-7 h-7 text-white" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Arcs du signal Wi-Fi au-dessus de l'avion -->
+                    <path d="M9.5 10.2C14.3 6.0 21.7 6.0 26.5 10.2" stroke="#BAE6FD" stroke-width="2.2" stroke-linecap="round"/>
+                    <path d="M12.8 13.4C15.8 10.8 20.2 10.8 23.2 13.4" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round"/>
+                    <circle cx="18" cy="16.2" r="1.5" fill="#38BDF8"/>
+                    <!-- Silhouette d'avion commercial vue de dessus -->
+                    <path d="M18 18.5C19.1 18.5 19.8 19.3 19.8 20.4V23.2L29.5 27.2V29.3L19.8 27.1V31.2L22.5 32.9V34.4L18 33.3L13.5 34.4V32.9L16.2 31.2V27.1L6.5 29.3V27.2L16.2 23.2V20.4C16.2 19.3 16.9 18.5 18 18.5Z" fill="white"/>
+                </svg>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2.5">
+                    <span class="font-bold text-base tracking-tight text-white">AeroWiFi <span class="text-sky-400">2030</span></span>
+                    <span class="bg-sky-500/20 text-sky-300 border border-sky-400/30 font-mono text-[11px] px-2.5 py-0.5 rounded-full font-medium">Horizon 2029/2030</span>
+                </div>
+                <p id="ui-app-subtitle" class="text-xs text-slate-400">Conformité spectrale Wi-Fi en cabine &amp; planification FIR</p>
+            </div>
+        </div>
+
+        <!-- Navigation Centrale : 2 GRANDS ONGLETS POUR DÉCHARGER L'INTERFACE -->
+        <nav class="flex items-center bg-slate-800 p-1.5 rounded-xl border border-slate-700 space-x-2">
+            <button id="tab-btn-reg" onclick="switchMainTab('REG')" class="px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2.5 bg-sky-600 text-white shadow-sm">
+                <i class="fa-solid fa-earth-americas text-sm"></i>
+                <span id="ui-tab-1">1. Réglementation &amp; Canaux par Pays</span>
+            </button>
+            <button id="tab-btn-fp" onclick="switchMainTab('FP')" class="px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2.5 text-slate-300 hover:text-white hover:bg-slate-700/70">
+                <i class="fa-solid fa-route text-sm"></i>
+                <span id="ui-tab-2">2. Planificateur de Vol &amp; Timeline FIR</span>
+            </button>
+        </nav>
+
+        <!-- Actions Droite : Synthèse Réglementaire & Langues -->
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleRegulatoryModal()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-medium flex items-center space-x-2 transition">
+                <i class="fa-solid fa-scale-balanced text-amber-400"></i>
+                <span id="ui-btn-mandates">Textes UE 2029 &amp; MIIT 129</span>
+            </button>
+
+            <!-- Sélecteur de langue FR / EN / DE -->
+            <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex text-xs font-semibold">
+                <button onclick="setLanguage('fr')" id="lang-fr" class="px-2.5 py-1 rounded-md bg-sky-500 text-white">FR</button>
+                <button onclick="setLanguage('en')" id="lang-en" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white">EN</button>
+                <button onclick="setLanguage('de')" id="lang-de" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white">DE</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- =========================================================================================
+         ONGLET 1 : RÉGLEMENTATION & MATRICE DES CANAUX PAR PAYS
+         ========================================================================================= -->
+    <section id="view-reg" class="flex-1 flex flex-col overflow-hidden min-h-0">
+        
+        <!-- Barre d'outils supérieure de l'onglet Réglementation -->
+        <div class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-sm z-20">
+            
+            <!-- Filtre d'Altitude : Gate-to-Gate vs > 10 000 pieds -->
+            <div class="flex items-center space-x-3">
+                <span id="ui-alt-label" class="text-xs font-semibold text-slate-600 flex items-center">
+                    <i class="fa-solid fa-plane-up text-sky-600 mr-1.5"></i>Phase de vol&nbsp;:
+                </span>
+                <div class="bg-slate-100 p-1 rounded-lg border border-slate-200 flex space-x-1">
+                    <button id="btn-alt-g2g" onclick="setAltitudeMode('G2G')" class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all bg-white text-sky-700 shadow-sm border border-slate-200">
+                        <i class="fa-solid fa-taxi mr-1.5"></i><span id="ui-btn-g2g">Gate-to-Gate (Sol + Vol)</span>
+                    </button>
+                    <button id="btn-alt-fl100" onclick="setAltitudeMode('FL100')" class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-600 hover:text-slate-900">
+                        <i class="fa-solid fa-cloud mr-1.5"></i><span id="ui-btn-fl100">Au-dessus de 10 000 ft (FL100+)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtre de Bandes RF -->
+            <div class="flex items-center space-x-3">
+                <span id="ui-band-label" class="text-xs font-semibold text-slate-600 flex items-center">
+                    <i class="fa-solid fa-wave-square text-sky-600 mr-1.5"></i>Filtre de bandes&nbsp;:
+                </span>
+                <div class="bg-slate-100 p-1 rounded-lg border border-slate-200 flex space-x-1 text-xs font-medium">
+                    <button onclick="setBandFilter('ALL')" id="btn-band-ALL" class="px-3 py-1.5 rounded-md bg-white text-sky-700 font-semibold shadow-sm border border-slate-200">Toutes</button>
+                    <button onclick="setBandFilter('NO24')" id="btn-band-NO24" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900">Hors 2.4 GHz</button>
+                    <button onclick="setBandFilter('5G')" id="btn-band-5G" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900">5 GHz seul</button>
+                    <button onclick="setBandFilter('6G')" id="btn-band-6G" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900">6 GHz seul</button>
+                </div>
+            </div>
+
+            <!-- Sélection rapide d'une juridiction + Fond de carte -->
+            <div class="flex items-center space-x-3">
+                <select id="quick-country-select" onchange="selectCountryByJurKey(this.value)" class="bg-slate-50 border border-slate-300 hover:border-sky-500 focus:border-sky-600 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none shadow-sm cursor-pointer">
+                    <option value="EU">🇪🇺 Union Européenne / CEPT (Janv. 2029)</option>
+                    <option value="CN">🇨🇳 Chine (MIIT Notice n° 129)</option>
+                    <option value="US">🇺🇸 États-Unis (FCC Part 15E)</option>
+                    <option value="CA">🇨🇦 Canada (ISED RSS-247/248)</option>
+                    <option value="UK">🇬🇧 Royaume-Uni (Ofcom)</option>
+                    <option value="JP">🇯🇵 Japon (MIC Civil Aeronautics)</option>
+                    <option value="IN">🇮🇳 Inde (DGCA / WPC)</option>
+                    <option value="AE">🇦🇪 Émirats Arabes Unis (TDRA)</option>
+                    <option value="BR">🇧🇷 Brésil (ANATEL)</option>
+                    <option value="SG">🇸🇬 Singapour (IMDA)</option>
+                    <option value="AU">🇦🇺 Australie (ACMA)</option>
+                    <option value="RU">🇷🇺 Russie &amp; CEI (SCRF)</option>
+                </select>
+
+                <select id="basemap-select" onchange="switchBasemap(this.value)" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none cursor-pointer">
+                    <option value="ESRI_LIGHT">Carte : Clair Pro (Esri)</option>
+                    <option value="ESRI_DARK">Carte : Sombre (Esri)</option>
+                    <option value="OSM_STD">Carte : OpenStreetMap</option>
+                    <option value="OFFLINE_GRID">Carte : Grille Hors-Ligne</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Espace principal Onglet 1 : Carte Interactive (53%) + Panneau Détaillé & Canaux (47%) -->
+        <div class="flex-1 grid grid-cols-12 overflow-hidden min-h-0">
+            
+            <!-- Gauche : Carte Mondiale des Réglementations -->
+            <div class="col-span-12 lg:col-span-6 relative flex flex-col bg-slate-200 border-r border-slate-200 min-h-0">
+                <div id="map-reg" class="flex-1 w-full h-full z-10"></div>
+
+                <!-- Légende claire en bas de la carte -->
+                <div class="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
+                    <div class="bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl p-3.5 shadow-lg pointer-events-auto">
+                        <div class="flex items-center justify-between mb-2">
+                            <span id="ui-legend-title" class="text-xs font-bold text-slate-800">Profil réglementaire en cabine (Horizon 2030)&nbsp;:</span>
+                            <span id="ui-legend-hint" class="text-[11px] font-medium text-sky-600"><i class="fa-solid fa-hand-pointer mr-1"></i>Cliquez sur un pays pour afficher ses canaux</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div class="flex items-center space-x-2 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                                <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>
+                                <span id="ui-leg-opt" class="text-slate-700 font-medium truncate">Spectre Large (5G+6G)</span>
+                            </div>
+                            <div class="flex items-center space-x-2 bg-sky-50 px-2.5 py-1.5 rounded-lg border border-sky-200">
+                                <span class="w-3 h-3 rounded-full bg-sky-500 shrink-0"></span>
+                                <span id="ui-leg-eu" class="text-slate-700 font-medium truncate">Modéré (UE sans DFS)</span>
+                            </div>
+                            <div class="flex items-center space-x-2 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200">
+                                <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>
+                                <span id="ui-leg-rest" class="text-slate-700 font-medium truncate">Restreint (U-NII-3 seul)</span>
+                            </div>
+                            <div class="flex items-center space-x-2 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-200">
+                                <span class="w-3 h-3 rounded-full bg-rose-500 shrink-0"></span>
+                                <span id="ui-leg-ban" class="text-slate-700 font-medium truncate">Coupé au sol / Interdit</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Droite : Fiche Pays, Sous-Bandes & Matrice Individuelle des Canaux -->
+            <div class="col-span-12 lg:col-span-6 bg-slate-50 flex flex-col overflow-y-auto min-h-0 p-6 space-y-5">
+                
+                <!-- 1. En-tête du pays sélectionné -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-center space-x-3.5">
+                            <div id="insp-badge-code" class="w-12 h-12 rounded-xl bg-sky-600 text-white font-mono font-bold text-lg flex items-center justify-center shadow-sm shrink-0">
+                                EU
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <h2 id="insp-country-name" class="text-lg font-bold text-slate-900">Union Européenne (Espace CEPT)</h2>
+                                    <span id="insp-iso-tag" class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">FRA / DEU / ESP...</span>
+                                </div>
+                                <p id="insp-authority" class="text-xs font-medium text-sky-700 mt-0.5">ECC Decision (22)01 / Mandat CE Janvier 2029 &amp; EASA</p>
+                            </div>
+                        </div>
+                        <!-- Statut global selon l'altitude -->
+                        <div id="insp-global-pill" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
+                            Autorisé Sol &amp; Vol
+                        </div>
+                    </div>
+
+                    <!-- Résumé réglementaire du pays -->
+                    <div class="mt-4 p-3.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-700 leading-relaxed" id="insp-notes">
+                        Chargement des informations réglementaires...
+                    </div>
+
+                    <!-- Compteurs rapides de canaux actifs -->
+                    <div class="mt-4 grid grid-cols-3 gap-3">
+                        <div class="bg-emerald-50/70 border border-emerald-200 rounded-lg px-3.5 py-2.5 flex items-center justify-between">
+                            <span id="ui-stat-active" class="text-xs font-medium text-emerald-800">Canaux Activés</span>
+                            <span id="stat-count-active" class="font-mono text-base font-bold text-emerald-600">45</span>
+                        </div>
+                        <div class="bg-rose-50/70 border border-rose-200 rounded-lg px-3.5 py-2.5 flex items-center justify-between">
+                            <span id="ui-stat-banned" class="text-xs font-medium text-rose-800">Canaux Interdits</span>
+                            <span id="stat-count-banned" class="font-mono text-base font-bold text-rose-600">25</span>
+                        </div>
+                        <div class="bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 flex items-center justify-between">
+                            <span id="ui-stat-filtered" class="text-xs font-medium text-slate-600">Masqués (Filtre)</span>
+                            <span id="stat-count-filtered" class="font-mono text-base font-bold text-slate-500">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Synthèse par Bande et Sous-Bande (Puissance EIRP & Conditions) -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-3.5">
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+                            <i class="fa-solid fa-layer-group text-sky-600 mr-2"></i>
+                            <span id="ui-subband-title">Réglementation par Bande et Sous-Bande</span>
+                        </h3>
+                        <span id="insp-active-phase-badge" class="text-[11px] font-mono font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded border border-sky-200">
+                            Mode : Gate-to-Gate (Sol inclus)
+                        </span>
+                    </div>
+
+                    <div id="subband-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        <!-- Généré dynamiquement par JS -->
+                    </div>
+                </div>
+
+                <!-- 3. Représentation visuelle individuelle de CHACUN DES CANAUX -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 flex items-center">
+                                <i class="fa-solid fa-table-cells text-sky-600 mr-2"></i>
+                                <span id="ui-channels-matrix-title">État Individuel des Canaux Wi-Fi en Cabine</span>
+                            </h3>
+                            <p id="ui-channels-matrix-desc" class="text-xs text-slate-500 mt-0.5">
+                                Représentation canal par canal selon le pays sélectionné, l'altitude et le filtre de bande actif.
+                            </p>
+                        </div>
+                        <!-- Légende des pastilles de canal -->
+                        <div class="flex items-center space-x-3 text-[11px] font-medium">
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 mr-1.5"></span><span id="ui-ch-leg-on">Activé</span></span>
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500 mr-1.5"></span><span id="ui-ch-leg-off">Interdit</span></span>
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-sm bg-slate-300 mr-1.5"></span><span id="ui-ch-leg-filt">Filtré</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Conteneur des grilles de canaux par sous-bande -->
+                    <div id="individual-channels-container" class="space-y-4">
+                        <!-- Généré dynamiquement par JS -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================================================
+         ONGLET 2 : PLANIFICATEUR DE VOL & CHRONOLOGIE DES FIR (SANS TYPE D'AVION)
+         ========================================================================================= -->
+    <section id="view-fp" class="hidden flex-1 flex flex-col overflow-hidden min-h-0">
+        
+        <!-- Barre de sélection du vol (Épurée, sans mention du type d'avion) -->
+        <div class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-sm z-20">
+            
+            <!-- Sélection d'un vol commercial réaliste ou couple Origine / Destination -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center space-x-2">
+                    <span id="ui-fp-preset-label" class="text-xs font-semibold text-slate-600">Routes ATS types&nbsp;:</span>
+                    <select id="preset-route-select" onchange="loadPresetRoute(this.value)" class="bg-slate-50 border border-slate-300 hover:border-sky-500 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 outline-none shadow-sm cursor-pointer">
+                        <option value="PVG_FRA">LH727 : Shanghai (ZSPD) → Francfort (EDDF)</option>
+                        <option value="CDG_HND">AF274 : Paris (LFPG) → Tokyo (RJTT) [Corridor Sud]</option>
+                        <option value="JFK_LHR">BA112 : New York (KJFK) → Londres (EGLL) [NAT Track]</option>
+                        <option value="TLS_JFK">AF84 : Toulouse (LFBO) → New York (KJFK)</option>
+                        <option value="DXB_SIN">EK412 : Dubaï (OMDB) → Singapour (WSSS)</option>
+                        <option value="FRA_GRU">LA8065 : Francfort (EDDF) → São Paulo (SBGR)</option>
+                    </select>
+                </div>
+
+                <div class="h-5 w-px bg-slate-200 hidden sm:block"></div>
+
+                <!-- Sélecteurs Départ / Arrivée personnalisés -->
+                <div class="flex items-center space-x-2">
+                    <span id="ui-fp-dep-label" class="text-xs font-medium text-slate-500">Départ&nbsp;:</span>
+                    <select id="dep-airport-select" onchange="computeCustomRoute()" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none cursor-pointer"></select>
+                    
+                    <i class="fa-solid fa-arrow-right text-slate-400 text-xs mx-1"></i>
+                    
+                    <span id="ui-fp-arr-label" class="text-xs font-medium text-slate-500">Arrivée&nbsp;:</span>
+                    <select id="arr-airport-select" onchange="computeCustomRoute()" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 outline-none cursor-pointer"></select>
+                </div>
+            </div>
+
+            <!-- Curseur de simulation de progression le long de la route + Infos synthétiques -->
+            <div class="flex items-center space-x-5">
+                <div class="flex items-center space-x-3 bg-slate-100 px-3.5 py-1.5 rounded-lg border border-slate-200">
+                    <span id="ui-fp-sim-label" class="text-xs font-semibold text-slate-700">Position du vol&nbsp;:</span>
+                    <input id="flight-progress-slider" type="range" min="0" max="100" value="40" oninput="updateAircraftProgress(this.value)" class="w-36 accent-sky-600 cursor-pointer">
+                    <span id="flight-active-fir-badge" class="font-mono text-xs font-bold text-sky-700 bg-white px-2.5 py-0.5 rounded border border-sky-200 shadow-sm">FIR: ZSHA</span>
+                </div>
+
+                <!-- Résumé Distance & Nombre de commutations -->
+                <div class="hidden xl:flex items-center space-x-4 text-xs">
+                    <div>
+                        <span class="text-slate-500" id="ui-fp-dist-lbl">Distance ATS :</span>
+                        <span id="fp-stat-distance" class="font-mono font-bold text-slate-800 ml-1">-- km</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500" id="ui-fp-firs-lbl">FIR traversées :</span>
+                        <span id="fp-stat-firs" class="font-mono font-bold text-sky-700 ml-1">--</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500" id="ui-fp-sw-lbl">Commutations Wi-Fi :</span>
+                        <span id="fp-stat-switches" class="font-mono font-bold text-amber-600 ml-1">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Partie Haute de l'onglet 2 : Carte de la Route ATS et des FIR (55% hauteur) -->
+        <div class="h-[55%] w-full relative bg-slate-200 border-b border-slate-200 shrink-0">
+            <div id="map-fp" class="w-full h-full z-10"></div>
+
+            <!-- Encart flottant léger indiquant la FIR actuellement survolée -->
+            <div class="absolute top-4 right-4 z-20 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl p-3.5 shadow-lg max-w-xs">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400" id="ui-fp-curr-box-title">État CWLU à la position simulée</div>
+                <div id="fp-live-fir-name" class="text-sm font-bold text-slate-900 mt-0.5">--</div>
+                <div id="fp-live-fir-channels" class="text-xs font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mt-2">
+                    --
+                </div>
+            </div>
+        </div>
+
+        <!-- Partie Basse de l'onglet 2 : Chronologie des FIR & Commutations Wi-Fi (45% hauteur) -->
+        <div class="flex-1 bg-slate-50 flex flex-col overflow-hidden min-h-0 px-6 py-4">
+            <div class="flex items-center justify-between mb-3 shrink-0">
+                <div class="flex items-center space-x-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
+                    <h3 id="ui-timeline-heading" class="text-sm font-bold text-slate-900">
+                        Chronologie des Régions d'Information de Vol (FIR) &amp; Changements de Configuration Wi-Fi
+                    </h3>
+                </div>
+                <span id="ui-timeline-sub" class="text-xs text-slate-500">
+                    Cliquez sur une étape FIR pour centrer la carte et voir les canaux à activer ou couper au franchissement de frontière
+                </span>
+            </div>
+
+            <!-- Cartes de la Timeline FIR (Défilement horizontal fluide) -->
+            <div id="fir-timeline-cards" class="flex-1 flex items-stretch space-x-4 overflow-x-auto pb-2 min-h-0">
+                <!-- Généré dynamiquement par JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= MODALE DE SYNTHÈSE DES TEXTES RÉGLEMENTAIRES (UE 2029 & CHINE MIIT 129) ================= -->
+    <div id="reg-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                        <i class="fa-solid fa-scale-balanced text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 id="modal-title" class="text-base font-bold text-slate-900">Référentiel Réglementaire Strict — Horizon 2029 / 2030</h3>
+                        <p class="text-xs text-slate-500">Synthèse des restrictions européennes 5 GHz (U-NII-2A/2C) et de la Notice 129 du MIIT chinois</p>
+                    </div>
+                </div>
+                <button onclick="toggleRegulatoryModal()" class="text-slate-400 hover:text-slate-700 text-lg px-2">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs leading-relaxed">
+                <!-- Bloc UE Janvier 2029 -->
+                <div class="bg-sky-50/60 border border-sky-200 rounded-xl p-4 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-sky-900 text-sm">🇪🇺 Union Européenne — Échéance Janvier 2029</span>
+                        <span class="font-mono text-[11px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-semibold">Canaux 52–144 Interdits</span>
+                    </div>
+                    <p class="text-slate-700">
+                        Pour protéger les radars météorologiques en bande C (5600–5650 MHz) et les satellites d'observation terrestre (EESS), l'utilisation à bord des aéronefs des sous-bandes 5 GHz soumises au DFS est <strong>strictement interdite à compter de janvier 2029</strong> :
+                    </p>
+                    <ul class="list-disc list-inside text-slate-700 space-y-1 font-medium">
+                        <li><strong>U-NII-2A (5250–5350 MHz)</strong> : Canaux 52, 56, 60, 64 ➔ <span class="text-rose-600 font-bold">INTERDITS</span></li>
+                        <li><strong>U-NII-2C (5470–5725 MHz)</strong> : Canaux 100 à 144 ➔ <span class="text-rose-600 font-bold">INTERDITS</span></li>
+                    </ul>
+                    <p class="text-slate-600 pt-1">
+                        <strong>Spectre de repli autorisé en UE :</strong> U-NII-1 (canaux 36–48), U-NII-3 (canaux 149–165, SRD 25 mW) et <strong>6 GHz LPI (U-NII-5, 5945–6425 MHz, canaux 1 à 93)</strong>.
+                    </p>
+                </div>
+
+                <!-- Bloc Chine MIIT Notice 129 -->
+                <div class="bg-amber-50/60 border border-amber-200 rounded-xl p-4 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-amber-900 text-sm">🇨🇳 Chine — Notice n° 129 du MIIT &amp; 6 GHz IMT</span>
+                        <span class="font-mono text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">Seuil &gt; 3000 m (FL100)</span>
+                    </div>
+                    <p class="text-slate-700">
+                        La réglementation du Ministère de l'Industrie et des Technologies de l'Information (MIIT Notice 129) encadre strictement les émissions WLAN et 5G en cabine :
+                    </p>
+                    <ul class="list-disc list-inside text-slate-700 space-y-1 font-medium">
+                        <li><strong>Bande 5.8 GHz (U-NII-3, canaux 149–165)</strong> : Seule bande 5 GHz autorisée en cabine, <strong>uniquement au-dessus de 3000 m (10 000 ft)</strong>. Coupure obligatoire au sol/taxi.</li>
+                        <li><strong>Bandes U-NII-1 / 2A / 2C (5150–5725 MHz)</strong> : <span class="text-rose-600 font-bold">INTERDITES</span> en exploitation cabine standard.</li>
+                        <li><strong>Bande 6 GHz (5925–7125 MHz)</strong> : <span class="text-rose-600 font-bold">INTERDITE au Wi-Fi</span> (allouée aux réseaux cellulaires 5G-Advanced / 6G IMT en Chine).</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="toggleRegulatoryModal()" class="px-5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                    Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= LOGIQUE APPLICATIVE JAVASCRIPT ================= -->
+    <script>
+        /*************************************************************************
+         * 1. CATALOGUE COMPLET DES CANAUX WI-FI PAR SOUS-BANDE (POUR LA MATRICE)
+         *************************************************************************/
+        const CHANNEL_CATALOG = [
+            {
+                key: 'ISM24',
+                bandGroup: '2.4G',
+                title: '2.4 GHz ISM',
+                freqRange: '2400 – 2483.5 MHz',
+                channels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+            },
+            {
+                key: 'UNII1',
+                bandGroup: '5G',
+                title: '5 GHz U-NII-1',
+                freqRange: '5150 – 5250 MHz',
+                channels: [36, 40, 44, 48]
+            },
+            {
+                key: 'UNII2A',
+                bandGroup: '5G',
+                title: '5 GHz U-NII-2A (DFS)',
+                freqRange: '5250 – 5350 MHz',
+                mandateTag: 'Interdit UE Janv. 2029',
+                channels: [52, 56, 60, 64]
+            },
+            {
+                key: 'UNII2C',
+                bandGroup: '5G',
+                title: '5 GHz U-NII-2C (DFS Météo)',
+                freqRange: '5470 – 5725 MHz',
+                mandateTag: 'Interdit UE Janv. 2029',
+                channels: [100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144]
+            },
+            {
+                key: 'UNII3',
+                bandGroup: '5G',
+                title: '5 GHz U-NII-3',
+                freqRange: '5725 – 5850 MHz',
+                mandateTag: 'Chine MIIT 129 (>3000m)',
+                channels: [149, 153, 157, 161, 165]
+            },
+            {
+                key: 'UNII5',
+                bandGroup: '6G',
+                title: '6 GHz Bas (U-NII-5 LPI)',
+                freqRange: '5925 – 6425 MHz',
+                pscChannels: [5, 21, 37, 53, 69, 85],
+                channels: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93]
+            },
+            {
+                key: 'UNII6_8',
+                bandGroup: '6G',
+                title: '6 GHz Haut (U-NII-6 / 7 / 8)',
+                freqRange: '6425 – 7125 MHz',
+                channels: [97, 113, 129, 145, 161, 177, 193, 209, 225]
+            }
+        ];
+
+        /*************************************************************************
+         * 2. DICTIONNAIRE MULTILINGUE (FR / EN / DE)
+         *************************************************************************/
+        const I18N = {
+            fr: {
+                subtitle: "Conformité spectrale Wi-Fi en cabine & planification FIR",
+                tab1: "1. Réglementation & Canaux par Pays",
+                tab2: "2. Planificateur de Vol & Timeline FIR",
+                btnMandates: "Textes UE 2029 & MIIT 129",
+                altLabel: "Phase de vol :",
+                btnG2G: "Gate-to-Gate (Sol + Vol)",
+                btnFL100: "Au-dessus de 10 000 ft (FL100+)",
+                bandLabel: "Filtre de bandes :",
+                bandAll: "Toutes",
+                bandNo24: "Hors 2.4 GHz",
+                band5G: "5 GHz seul",
+                band6G: "6 GHz seul",
+                legendTitle: "Profil réglementaire en cabine (Horizon 2030) :",
+                legendHint: "Cliquez sur un pays pour afficher ses canaux",
+                legOpt: "Spectre Large (5G+6G)",
+                legEu: "Modéré (UE sans DFS)",
+                legRest: "Restreint (U-NII-3 seul)",
+                legBan: "Coupé au sol / Interdit",
+                statActive: "Canaux Activés",
+                statBanned: "Canaux Interdits",
+                statFiltered: "Masqués (Filtre)",
+                subbandTitle: "Réglementation par Bande et Sous-Bande",
+                matrixTitle: "État Individuel des Canaux Wi-Fi en Cabine",
+                matrixDesc: "Représentation canal par canal selon le pays sélectionné, l'altitude et le filtre de bande actif.",
+                chLegOn: "Activé",
+                chLegOff: "Interdit",
+                chLegFilt: "Filtré",
+                modeG2GText: "Mode : Gate-to-Gate (Sol inclus)",
+                modeFL100Text: "Mode : Croisière > 10 000 ft",
+                statusG2GOk: "Autorisé Sol & Vol",
+                statusFL100Only: "Autorisé > 10 000 ft uniquement",
+                statusGroundBan: "Coupé au sol (Requis > 10 000 ft)",
+                fpPresetLabel: "Routes ATS types :",
+                fpDepLabel: "Départ :",
+                fpArrLabel: "Arrivée :",
+                fpSimLabel: "Position du vol :",
+                fpDistLbl: "Distance ATS :",
+                fpFirsLbl: "FIR traversées :",
+                fpSwLbl: "Commutations Wi-Fi :",
+                fpCurrBoxTitle: "État CWLU à la position simulée",
+                timelineHeading: "Chronologie des Régions d'Information de Vol (FIR) & Changements de Configuration Wi-Fi",
+                timelineSub: "Cliquez sur une étape FIR pour centrer la carte et voir les canaux à activer ou couper au franchissement de frontière",
+                cardEnable: "ACTIVER",
+                cardCut: "COUPER",
+                cardMaintain: "MAINTENIR"
+            },
+            en: {
+                subtitle: "Cabin Wi-Fi Spectral Compliance & FIR Route Planner",
+                tab1: "1. Country Regulations & Channel Matrix",
+                tab2: "2. Flight Planner & FIR Timeline",
+                btnMandates: "EU 2029 & MIIT 129 Mandates",
+                altLabel: "Flight Phase:",
+                btnG2G: "Gate-to-Gate (Ground + Flight)",
+                btnFL100: "Above 10,000 ft (FL100+ Cruise)",
+                bandLabel: "Band Filter:",
+                bandAll: "All Bands",
+                bandNo24: "Excl. 2.4 GHz",
+                band5G: "5 GHz Only",
+                band6G: "6 GHz Only",
+                legendTitle: "Cabin Regulatory Profile (2030 Horizon):",
+                legendHint: "Click any country to inspect its channels",
+                legOpt: "Full Spectrum (5G+6G)",
+                legEu: "Moderate (EU No-DFS)",
+                legRest: "Restricted (U-NII-3 only)",
+                legBan: "Prohibited on Ground",
+                statActive: "Active Channels",
+                statBanned: "Prohibited Channels",
+                statFiltered: "Hidden (Filtered)",
+                subbandTitle: "Regulation by Band and Sub-Band",
+                matrixTitle: "Individual Cabin Wi-Fi Channel Status",
+                matrixDesc: "Channel-by-channel status based on selected country, altitude phase, and active band filter.",
+                chLegOn: "Active",
+                chLegOff: "Prohibited",
+                chLegFilt: "Filtered",
+                modeG2GText: "Mode: Gate-to-Gate (Ground incl.)",
+                modeFL100Text: "Mode: Cruise > 10,000 ft",
+                statusG2GOk: "Permitted Ground & Flight",
+                statusFL100Only: "Permitted > 10,000 ft Only",
+                statusGroundBan: "Cut on Ground (Req. > 10,000 ft)",
+                fpPresetLabel: "Preset ATS Routes:",
+                fpDepLabel: "Origin:",
+                fpArrLabel: "Destination:",
+                fpSimLabel: "Flight Progress:",
+                fpDistLbl: "ATS Distance:",
+                fpFirsLbl: "Intersected FIRs:",
+                fpSwLbl: "Wi-Fi Switches:",
+                fpCurrBoxTitle: "CWLU State at Simulated Position",
+                timelineHeading: "Flight Information Regions (FIR) Timeline & Wi-Fi Configuration Changes",
+                timelineSub: "Click any FIR card to focus the map and inspect required channel switching at boundary crossing",
+                cardEnable: "ENABLE",
+                cardCut: "CUT IMMEDIATELY",
+                cardMaintain: "MAINTAIN"
+            },
+            de: {
+                subtitle: "Kabinen-WLAN-Spektrumkonformität & FIR-Flugplaner",
+                tab1: "1. Ländervorschriften & Kanalmatrix",
+                tab2: "2. Flugplaner & FIR-Zeitleiste",
+                btnMandates: "EU 2029 & MIIT 129 Mandate",
+                altLabel: "Flugphase:",
+                btnG2G: "Gate-to-Gate (Boden + Flug)",
+                btnFL100: "Über 10.000 ft (FL100+ Reiseflug)",
+                bandLabel: "Bandfilter:",
+                bandAll: "Alle Bänder",
+                bandNo24: "Ohne 2.4 GHz",
+                band5G: "Nur 5 GHz",
+                band6G: "Nur 6 GHz",
+                legendTitle: "Regulatorisches Kabinenprofil (Horizont 2030):",
+                legendHint: "Klicken Sie auf ein Land für Kanaldetails",
+                legOpt: "Breitspektrum (5G+6G)",
+                legEu: "Moderat (EU ohne DFS)",
+                legRest: "Eingeschränkt (Nur U-NII-3)",
+                legBan: "Am Boden gesperrt",
+                statActive: "Aktive Kanäle",
+                statBanned: "Gesperrte Kanäle",
+                statFiltered: "Gefiltert",
+                subbandTitle: "Vorschriften nach Band und Teilband",
+                matrixTitle: "Individueller Status der WLAN-Kanäle",
+                matrixDesc: "Kanal-für-Kanal-Darstellung je nach ausgewähltem Land, Flughöhe und aktivem Bandfilter.",
+                chLegOn: "Aktiv",
+                chLegOff: "Verboten",
+                chLegFilt: "Gefiltert",
+                modeG2GText: "Modus: Gate-to-Gate (inkl. Boden)",
+                modeFL100Text: "Modus: Reiseflug > 10.000 ft",
+                statusG2GOk: "Boden & Flug erlaubt",
+                statusFL100Only: "Nur > 10.000 ft erlaubt",
+                statusGroundBan: "Am Boden aus (Erf. > 10.000 ft)",
+                fpPresetLabel: "ATS-Standardrouten:",
+                fpDepLabel: "Abflug:",
+                fpArrLabel: "Ankunft:",
+                fpSimLabel: "Flugposition:",
+                fpDistLbl: "ATS-Distanz:",
+                fpFirsLbl: "Durchflogene FIRs:",
+                fpSwLbl: "WLAN-Umschaltungen:",
+                fpCurrBoxTitle: "CWLU-Status an simulierter Position",
+                timelineHeading: "FIR-Zeitleiste & Erforderliche WLAN-Konfigurationsänderungen",
+                timelineSub: "Klicken Sie auf eine FIR-Karte, um die Karte zu zentrieren und die Kanalumschaltungen zu prüfen",
+                cardEnable: "AKTIVIEREN",
+                cardCut: "SOFORT ABSCHALTEN",
+                cardMaintain: "BEIBEHALTEN"
+            }
+        };
+
+        /*************************************************************************
+         * 3. BASE DE DONNÉES RÉGLEMENTAIRE 2030 PAR JURIDICTION
+         *************************************************************************/
+        const JURISDICTIONS = {
+            EU: {
+                code: "EU",
+                isoList: ["FRA", "DEU", "ESP", "ITA", "NLD", "BEL", "LUX", "AUT", "POL", "SWE", "NOR", "FIN", "DNK", "PRT", "GRC", "IRL", "CHE", "CZE", "HUN", "ROU", "BGR", "HRV", "SVK", "SVN", "EST", "LVA", "LTU"],
+                name: {
+                    fr: "Union Européenne & Espace CEPT",
+                    en: "European Union & CEPT Area",
+                    de: "Europäische Union & CEPT-Raum"
+                },
+                authority: "ECC Decision (22)01 / Mandat CE Janvier 2029 & EASA",
+                notes: {
+                    fr: "Échéance Janvier 2029 : interdiction stricte en vol et au sol des sous-bandes 5 GHz DFS U-NII-2A (canaux 52–64) et U-NII-2C (canaux 100–144) afin de protéger les radars météo bande C. Exploitation Gate-to-Gate autorisée sur U-NII-1 (canaux 36–48), U-NII-3 (canaux 149–165 à 25 mW) et 6 GHz LPI (U-NII-5, canaux 1–93).",
+                    en: "January 2029 Mandate: strict prohibition of 5 GHz DFS sub-bands U-NII-2A (ch 52–64) and U-NII-2C (ch 100–144) to protect C-band weather radars. Gate-to-Gate operation allowed on U-NII-1 (ch 36–48), U-NII-3 (ch 149–165, 25 mW SRD), and 6 GHz LPI (U-NII-5, ch 1–93).",
+                    de: "Mandat Januar 2029: Striktes Verbot der 5-GHz-DFS-Teilbänder U-NII-2A (Kanäle 52–64) und U-NII-2C (Kanäle 100–144) zum Schutz von Wetterradaren. Gate-to-Gate erlaubt auf U-NII-1 (36–48), U-NII-3 (149–165, 25 mW) und 6 GHz LPI (U-NII-5, Kanäle 1–93)."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "100 mW (20 dBm)" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW LPI Cabine" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "INTERDIT (Janv. 2029)" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "INTERDIT (Janv. 2029)" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "25 mW (14 dBm SRD)" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "200 mW LPI (23 dBm)" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Non alloué WAS/RLAN" }
+                }
+            },
+            CN: {
+                code: "CN",
+                isoList: ["CHN"],
+                name: {
+                    fr: "République Populaire de Chine",
+                    en: "People's Republic of China",
+                    de: "Volksrepublik China"
+                },
+                authority: "MIIT Notice n° 129 (5G/WLAN) & Allocation IMT 6 GHz",
+                notes: {
+                    fr: "Notice 129 du MIIT : toutes les émissions Wi-Fi cabine doivent être coupées au sol et en dessous de 3000 mètres (10 000 ft). Au-dessus de FL100, seule la sous-bande 5.8 GHz U-NII-3 (canaux 149 à 165) ainsi que le 2.4 GHz sont autorisés. Les bandes U-NII-1/2A/2C et l'intégralité du 6 GHz (réservé à la 5G/6G IMT) sont interdites.",
+                    en: "MIIT Notice 129: cabin Wi-Fi emissions are prohibited on ground and below 3,000 meters (10,000 ft). Above FL100, only 5.8 GHz U-NII-3 (channels 149–165) and 2.4 GHz are permitted. U-NII-1/2A/2C and the entire 6 GHz band (reserved for 5G/6G IMT) are strictly prohibited.",
+                    de: "MIIT-Mitteilung 129: Kabinen-WLAN ist am Boden und unter 3000 m (10.000 ft) verboten. Über FL100 sind nur 5.8 GHz U-NII-3 (Kanäle 149–165) und 2.4 GHz erlaubt. U-NII-1/2A/2C sowie das gesamte 6-GHz-Band (reserviert für 5G/6G IMT) sind verboten."
+                },
+                bands: {
+                    ISM24:   { g2g: false, fl100: true,  eirp: "100 mW (> 3000m uniq.)" },
+                    UNII1:   { g2g: false, fl100: false, eirp: "INTERDIT (MIIT 129)" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "INTERDIT (MIIT 129)" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "INTERDIT (MIIT 129)" },
+                    UNII3:   { g2g: false, fl100: true,  eirp: "200 mW (> 3000m uniq.)" },
+                    UNII5:   { g2g: false, fl100: false, eirp: "INTERDIT (Réservé 5G/6G IMT)" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "INTERDIT (Réservé 5G/6G IMT)" }
+                }
+            },
+            US: {
+                code: "US",
+                isoList: ["USA"],
+                name: {
+                    fr: "États-Unis d'Amérique",
+                    en: "United States of America",
+                    de: "Vereinigte Staaten von Amerika"
+                },
+                authority: "FCC Part 15 Subpart E & 6 GHz Order (FCC 20-51)",
+                notes: {
+                    fr: "Spectre très large Gate-to-Gate : autorisation complète de 5 GHz U-NII-1 (canaux 36–48) et U-NII-3 (canaux 149–165, jusqu'à 1 W), ainsi que de l'intégralité de la bande 6 GHz LPI (U-NII-5 à U-NII-8, canaux 1 à 225) à bord des avions commerciaux gros-porteurs.",
+                    en: "Broad Gate-to-Gate spectrum: full authorization of 5 GHz U-NII-1 (ch 36–48) and U-NII-3 (ch 149–165 up to 1 W), plus full 1200 MHz of 6 GHz LPI (U-NII-5 through U-NII-8, channels 1–225) onboard large commercial aircraft.",
+                    de: "Breites Gate-to-Gate-Spektrum: Volle Zulassung von 5 GHz U-NII-1 (36–48) und U-NII-3 (149–165), sowie des gesamten 6-GHz-LPI-Bandes (U-NII-5 bis U-NII-8, Kanäle 1–225) in Verkehrsflugzeugen."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "1000 mW (30 dBm)" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "250 mW (24 dBm)" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Exclu CWLU (DFS)" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Exclu TDWR Radar" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "1000 mW (30 dBm)" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "250 mW LPI Cabine" },
+                    UNII6_8: { g2g: true,  fl100: true,  eirp: "250 mW LPI Cabine" }
+                }
+            },
+            CA: {
+                code: "CA",
+                isoList: ["CAN"],
+                name: {
+                    fr: "Canada",
+                    en: "Canada",
+                    de: "Kanada"
+                },
+                authority: "ISDE / ISED RSS-247 & RSS-248 (6 GHz LPI)",
+                notes: {
+                    fr: "Harmonisé avec l'Amérique du Nord sur le 6 GHz LPI (5925–7125 MHz) et U-NII-3 Gate-to-Gate. En sous-bande U-NII-1, l'exploitation en cabine est pleinement ouverte en croisière au-dessus de 10 000 ft.",
+                    en: "Harmonized with North America on 6 GHz LPI (5925–7125 MHz) and U-NII-3 Gate-to-Gate. U-NII-1 is fully available in cruise above 10,000 ft.",
+                    de: "Harmonisiert mit Nordamerika für 6 GHz LPI (5925–7125 MHz) und U-NII-3 Gate-to-Gate. U-NII-1 ist im Reiseflug über 10.000 ft freigegeben."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "1000 mW" },
+                    UNII1:   { g2g: false, fl100: true,  eirp: "200 mW (>10 000 ft)" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Interdit Cabine" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Interdit Radar Météo" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "1000 mW" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "250 mW LPI" },
+                    UNII6_8: { g2g: true,  fl100: true,  eirp: "250 mW LPI" }
+                }
+            },
+            UK: {
+                code: "UK",
+                isoList: ["GBR"],
+                name: {
+                    fr: "Royaume-Uni",
+                    en: "United Kingdom",
+                    de: "Vereinigtes Königreich"
+                },
+                authority: "Ofcom UK Interface Requirement 2030 & CAA",
+                notes: {
+                    fr: "Aligné sur le retrait des canaux 5 GHz DFS (52 à 144) pour la protection des radars météo, mais autorise une puissance supérieure sur U-NII-3 (250 mW) ainsi que la bande 6 GHz Basse (U-NII-5, canaux 1 à 93) Gate-to-Gate.",
+                    en: "Aligned with the removal of 5 GHz DFS channels (52–144) for weather radar protection, while permitting higher EIRP on U-NII-3 (250 mW) and Lower 6 GHz (U-NII-5, ch 1–93) Gate-to-Gate.",
+                    de: "Abgestimmt auf die Abschaltung der 5-GHz-DFS-Kanäle (52–144), erlaubt jedoch höhere Leistung auf U-NII-3 (250 mW) sowie das untere 6-GHz-Band (U-NII-5, Kanäle 1–93) Gate-to-Gate."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "100 mW" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "INTERDIT (DFS)" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "INTERDIT (Radars)" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "250 mW (24 dBm)" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "250 mW LPI" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Non ouvert aéronef" }
+                }
+            },
+            JP: {
+                code: "JP",
+                isoList: ["JPN"],
+                name: {
+                    fr: "Japon",
+                    en: "Japan",
+                    de: "Japan"
+                },
+                authority: "MIC Radio Act & Civil Aeronautics Bureau",
+                notes: {
+                    fr: "Configuration inverse de la Chine : au Japon, la sous-bande 5.8 GHz U-NII-3 (canaux 149–165) est STRICTEMENT INTERDITE en cabine (réservée aux systèmes DSRC/télépéage et radars). Il faut basculer immédiatement sur U-NII-1 (canaux 36–48) et 6 GHz LPI (U-NII-5, canaux 1–93).",
+                    en: "Opposite configuration to China: in Japan, 5.8 GHz U-NII-3 (channels 149–165) is STRICTLY PROHIBITED in aircraft cabins. Controllers must immediately switch to U-NII-1 (ch 36–48) and 6 GHz LPI (U-NII-5, ch 1–93).",
+                    de: "Umgekehrte Konfiguration zu China: In Japan ist 5.8 GHz U-NII-3 (Kanäle 149–165) in Flugzeugkabinen STRIKT VERBOTEN. Es muss sofort auf U-NII-1 (36–48) und 6 GHz LPI (U-NII-5, 1–93) umgeschaltet werden."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "100 mW" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW LPI" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII3:   { g2g: false, fl100: false, eirp: "INTERDIT (MIC Japon)" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "200 mW LPI" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Interdit" }
+                }
+            },
+            IN: {
+                code: "IN",
+                isoList: ["IND"],
+                name: {
+                    fr: "Inde",
+                    en: "India",
+                    de: "Indien"
+                },
+                authority: "DGCA & WPC Flight and Maritime Connectivity Rules",
+                notes: {
+                    fr: "Règle DGCA stricte : le Wi-Fi en cabine ne peut être activé qu'une fois que l'appareil a franchi 3000 mètres (10 000 ft). Au-dessus de FL100, les sous-bandes U-NII-1 (canaux 36–48) et U-NII-3 (canaux 149–165) sont autorisées.",
+                    en: "Strict DGCA rule: cabin Wi-Fi may only be enabled above 3,000 meters (10,000 ft). Above FL100, U-NII-1 (ch 36–48) and U-NII-3 (ch 149–165) are permitted.",
+                    de: "Strikte DGCA-Regel: Kabinen-WLAN darf erst über 3000 m (10.000 ft) aktiviert werden. Über FL100 sind U-NII-1 (36–48) und U-NII-3 (149–165) erlaubt."
+                },
+                bands: {
+                    ISM24:   { g2g: false, fl100: true,  eirp: "100 mW (>10 000 ft)" },
+                    UNII1:   { g2g: false, fl100: true,  eirp: "200 mW (>10 000 ft)" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Interdit" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Interdit" },
+                    UNII3:   { g2g: false, fl100: true,  eirp: "200 mW (>10 000 ft)" },
+                    UNII5:   { g2g: false, fl100: false, eirp: "Non autorisé aéronef" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Non autorisé" }
+                }
+            },
+            AE: {
+                code: "AE",
+                isoList: ["ARE", "SAU", "QAT", "OMN", "KWT", "BHR", "TUR", "EGY"],
+                name: {
+                    fr: "Émirats Arabes Unis & Moyen-Orient (TDRA)",
+                    en: "United Arab Emirates & Middle East (TDRA)",
+                    de: "Vereinigte Arabische Emirate & Naher Osten (TDRA)"
+                },
+                authority: "TDRA UAE & GCAA Class Authorization",
+                notes: {
+                    fr: "Autorise l'exploitation Gate-to-Gate sur 2.4 GHz, 5 GHz U-NII-1 (canaux 36–48), U-NII-3 (canaux 149–165) ainsi que la bande 6 GHz Basse LPI (U-NII-5, canaux 1–93).",
+                    en: "Permits Gate-to-Gate operation on 2.4 GHz, 5 GHz U-NII-1 (ch 36–48), U-NII-3 (ch 149–165), and Lower 6 GHz LPI (U-NII-5, ch 1–93).",
+                    de: "Erlaubt Gate-to-Gate-Betrieb auf 2.4 GHz, 5 GHz U-NII-1 (36–48), U-NII-3 (149–165) sowie im unteren 6-GHz-Band LPI (U-NII-5, Kanäle 1–93)."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "100 mW" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Exclu Météo" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "100 mW" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "200 mW LPI" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Réservé IMT" }
+                }
+            },
+            BR: {
+                code: "BR",
+                isoList: ["BRA", "ARG", "CHL", "COL", "PER"],
+                name: {
+                    fr: "Brésil & Amérique du Sud (ANATEL)",
+                    en: "Brazil & South America (ANATEL)",
+                    de: "Brasilien & Südamerika (ANATEL)"
+                },
+                authority: "ANATEL Act 1306 & Résolution 726",
+                notes: {
+                    fr: "Autorise Gate-to-Gate les sous-bandes 5 GHz U-NII-1 et U-NII-3 ainsi que la bande 6 GHz Basse LPI (U-NII-5, canaux 1 à 93) à bord des aéronefs.",
+                    en: "Authorizes Gate-to-Gate operation on 5 GHz U-NII-1 and U-NII-3 as well as Lower 6 GHz LPI (U-NII-5, channels 1–93) onboard aircraft.",
+                    de: "Erlaubt Gate-to-Gate-Betrieb auf 5 GHz U-NII-1 und U-NII-3 sowie im unteren 6-GHz-Band LPI (U-NII-5, Kanäle 1–93)."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "400 mW" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Exclu Radar" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "400 mW" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "200 mW LPI" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Sous révision" }
+                }
+            },
+            SG: {
+                code: "SG",
+                isoList: ["SGP", "MYS", "THA", "VNM", "IDN", "PHL"],
+                name: {
+                    fr: "Singapour & ASEAN (IMDA)",
+                    en: "Singapore & ASEAN (IMDA)",
+                    de: "Singapur & ASEAN (IMDA)"
+                },
+                authority: "IMDA Short Range Devices Spec & CAAS",
+                notes: {
+                    fr: "Hub majeur Asie-Pacifique : exploitation Gate-to-Gate ouverte sur 2.4 GHz, 5 GHz U-NII-1 (36–48), U-NII-3 (149–165) et 6 GHz LPI (U-NII-5, canaux 1–93).",
+                    en: "Major APAC hub: Gate-to-Gate operation permitted on 2.4 GHz, 5 GHz U-NII-1 (36–48), U-NII-3 (149–165), and 6 GHz LPI (U-NII-5, ch 1–93).",
+                    de: "APAC-Drehkreuz: Gate-to-Gate-Betrieb auf 2.4 GHz, 5 GHz U-NII-1 (36–48), U-NII-3 (149–165) und 6 GHz LPI (U-NII-5, Kanäle 1–93) freigegeben."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "200 mW" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "1000 mW" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "250 mW LPI" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Non alloué" }
+                }
+            },
+            AU: {
+                code: "AU",
+                isoList: ["AUS", "NZL"],
+                name: {
+                    fr: "Australie & Océanie (ACMA)",
+                    en: "Australia & Oceania (ACMA)",
+                    de: "Australien & Ozeanien (ACMA)"
+                },
+                authority: "ACMA Radiocommunications LIPD Class Licence",
+                notes: {
+                    fr: "Autorise l'exploitation Gate-to-Gate sur 2.4 GHz, 5 GHz U-NII-1, U-NII-3 et 6 GHz Bas (U-NII-5 LPI, canaux 1 à 93).",
+                    en: "Authorizes Gate-to-Gate operation on 2.4 GHz, 5 GHz U-NII-1, U-NII-3, and Lower 6 GHz (U-NII-5 LPI, ch 1–93).",
+                    de: "Erlaubt Gate-to-Gate-Betrieb auf 2.4 GHz, 5 GHz U-NII-1, U-NII-3 und im unteren 6-GHz-Band (U-NII-5 LPI, Kanäle 1–93)."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "100 mW" },
+                    UNII1:   { g2g: true,  fl100: true,  eirp: "200 mW" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Exclu DFS" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Exclu Radar" },
+                    UNII3:   { g2g: true,  fl100: true,  eirp: "1000 mW" },
+                    UNII5:   { g2g: true,  fl100: true,  eirp: "250 mW LPI" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Sous étude" }
+                }
+            },
+            RU: {
+                code: "RU",
+                isoList: ["RUS", "KAZ", "UZB", "AZE", "GEO", "ARM", "BLR", "TKM"],
+                name: {
+                    fr: "Espace Eurasie / CEI (SCRF)",
+                    en: "Eurasia / CIS Airspace (SCRF)",
+                    de: "Eurasien / GUS-Luftraum (SCRF)"
+                },
+                authority: "SCRF & Réglementations Aéronautiques Nationales",
+                notes: {
+                    fr: "Autorise les sous-bandes 5 GHz U-NII-1 (canaux 36–48) et U-NII-3 (canaux 149–165) en croisière au-dessus de 3000 m (FL100). La bande 6 GHz n'est pas autorisée pour le Wi-Fi embarqué.",
+                    en: "Permits 5 GHz U-NII-1 (ch 36–48) and U-NII-3 (ch 149–165) in cruise above 3,000 m (FL100). The 6 GHz band is not authorized for onboard Wi-Fi.",
+                    de: "Erlaubt 5 GHz U-NII-1 (36–48) und U-NII-3 (149–165) im Reiseflug über 3000 m (FL100). Das 6-GHz-Band ist für Bord-WLAN nicht zugelassen."
+                },
+                bands: {
+                    ISM24:   { g2g: true,  fl100: true,  eirp: "100 mW" },
+                    UNII1:   { g2g: false, fl100: true,  eirp: "200 mW (>3000m)" },
+                    UNII2A:  { g2g: false, fl100: false, eirp: "Interdit" },
+                    UNII2C:  { g2g: false, fl100: false, eirp: "Interdit" },
+                    UNII3:   { g2g: false, fl100: true,  eirp: "100 mW (>3000m)" },
+                    UNII5:   { g2g: false, fl100: false, eirp: "Interdit" },
+                    UNII6_8: { g2g: false, fl100: false, eirp: "Interdit" }
+                }
+            }
+        };
+
+        // Table de correspondance rapide Code ISO-A3 -> Juridiction
+        const ISO_TO_JUR = {};
+        Object.keys(JURISDICTIONS).forEach(k => {
+            JURISDICTIONS[k].isoList.forEach(iso => { ISO_TO_JUR[iso] = k; });
+        });
+
+        /*************************************************************************
+         * 4. BASE DE DONNÉES DES FIR (FLIGHT INFORMATION REGIONS) & AÉROPORTS
+         *************************************************************************/
+        const FIR_DATABASE = [
+            {
+                id: "LFFF", name: "Paris FIR", jur: "EU",
+                poly: [[51.2, -5.0], [51.2, 8.2], [46.5, 8.2], [46.5, -5.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C (Canaux 52-144)"
+            },
+            {
+                id: "LFBB", name: "Bordeaux FIR", jur: "EU",
+                poly: [[46.5, -4.5], [46.5, 4.5], [42.3, 4.5], [42.3, -4.5]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C (Canaux 52-144)"
+            },
+            {
+                id: "EDGG", name: "Langen / Frankfurt FIR", jur: "EU",
+                poly: [[54.8, 6.0], [54.8, 15.0], [47.3, 15.0], [47.3, 6.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C (Canaux 52-144)"
+            },
+            {
+                id: "EGTT", name: "London FIR", jur: "UK",
+                poly: [[56.0, -6.0], [56.0, 2.5], [49.8, 2.5], [49.8, -6.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (250mW) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C (Canaux 52-144)"
+            },
+            {
+                id: "EGGX", name: "Shanwick Oceanic FIR", jur: "UK",
+                poly: [[60.0, -30.0], [60.0, -8.0], [45.0, -8.0], [45.0, -30.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G LPI",
+                bannedSummary: "U-NII-2A/2C (Canaux 52-144)"
+            },
+            {
+                id: "CZQX", name: "Gander Oceanic FIR", jur: "CA",
+                poly: [[62.0, -60.0], [62.0, -30.0], [44.0, -30.0], [44.0, -60.0]],
+                activeSummary: "2.4G + U-NII-1 + U-NII-3 + 6G Complet (1-225)",
+                bannedSummary: "U-NII-2A/2C (52-144)"
+            },
+            {
+                id: "KZNY", name: "New York FIR", jur: "US",
+                poly: [[45.0, -80.0], [45.0, -60.0], [36.0, -60.0], [36.0, -80.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (1W) + 6G Complet (1-225)",
+                bannedSummary: "U-NII-2A/2C (52-144)"
+            },
+            {
+                id: "LTAA", name: "Ankara FIR", jur: "AE",
+                poly: [[42.5, 26.0], [42.5, 44.8], [35.8, 44.8], [35.8, 26.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G Bas (1-93)",
+                bannedSummary: "U-NII-2A/2C & 6G Haut"
+            },
+            {
+                id: "UBBA", name: "Baku / Caucasus FIR", jur: "RU",
+                poly: [[43.5, 44.8], [43.5, 53.0], [38.0, 53.0], [38.0, 44.8]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) [>FL100]",
+                bannedSummary: "Tout 6 GHz (1-225) & U-NII-2A/2C"
+            },
+            {
+                id: "UAAA", name: "Almaty Central Asia FIR", jur: "RU",
+                poly: [[51.0, 53.0], [51.0, 74.0], [39.0, 74.0], [39.0, 53.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) [>FL100]",
+                bannedSummary: "Tout 6 GHz (1-225) & U-NII-2A/2C"
+            },
+            {
+                id: "ZWUQ", name: "Urumqi FIR (Chine Ouest)", jur: "CN",
+                poly: [[49.0, 74.0], [49.0, 96.0], [35.0, 96.0], [35.0, 74.0]],
+                activeSummary: "2.4G + U-NII-3 (149-165) UNIQUEMENT (>3000m)",
+                bannedSummary: "U-NII-1 (36-48), U-NII-2A/2C & Tout 6 GHz (MIIT 129)"
+            },
+            {
+                id: "ZBPE", name: "Beijing FIR (Chine Nord)", jur: "CN",
+                poly: [[45.5, 96.0], [45.5, 124.0], [34.5, 124.0], [34.5, 96.0]],
+                activeSummary: "2.4G + U-NII-3 (149-165) UNIQUEMENT (>3000m)",
+                bannedSummary: "U-NII-1 (36-48), U-NII-2A/2C & Tout 6 GHz (MIIT 129)"
+            },
+            {
+                id: "ZSHA", name: "Shanghai FIR (Chine Est)", jur: "CN",
+                poly: [[34.5, 114.0], [34.5, 125.5], [25.0, 125.5], [25.0, 114.0]],
+                activeSummary: "2.4G + U-NII-3 (149-165) UNIQUEMENT (>3000m)",
+                bannedSummary: "U-NII-1 (36-48), U-NII-2A/2C & Tout 6 GHz (MIIT 129)"
+            },
+            {
+                id: "RJJJ", name: "Fukuoka FIR (Japon)", jur: "JP",
+                poly: [[45.0, 127.0], [45.0, 146.0], [28.0, 146.0], [28.0, 127.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-3 (149-165 INTERDIT MIC Japon) & U-NII-2A/2C"
+            },
+            {
+                id: "OMAE", name: "Emirates FIR", jur: "AE",
+                poly: [[27.0, 51.0], [27.0, 58.0], [22.0, 58.0], [22.0, 51.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C & 6G Haut"
+            },
+            {
+                id: "VABF", name: "Mumbai FIR (Inde)", jur: "IN",
+                poly: [[24.0, 65.0], [24.0, 82.0], [10.0, 82.0], [10.0, 65.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) [>10 000 ft]",
+                bannedSummary: "Tout 6 GHz & Coupure obligatoire au sol"
+            },
+            {
+                id: "WSJC", name: "Singapore FIR", jur: "SG",
+                poly: [[8.0, 98.0], [8.0, 108.0], [-2.0, 108.0], [-2.0, 98.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (1W) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C"
+            },
+            {
+                id: "SBRE", name: "Recife / Atlantique Sud FIR", jur: "BR",
+                poly: [[5.0, -45.0], [5.0, -20.0], [-26.0, -20.0], [-26.0, -50.0]],
+                activeSummary: "2.4G + U-NII-1 (36-48) + U-NII-3 (149-165) + 6G LPI (1-93)",
+                bannedSummary: "U-NII-2A/2C"
+            }
+        ];
+
+        const AIRPORTS = {
+            LFPG: { icao: "LFPG", iata: "CDG", city: "Paris Charles de Gaulle", lat: 49.0097, lon: 2.5479 },
+            LFBO: { icao: "LFBO", iata: "TLS", city: "Toulouse-Blagnac", lat: 43.6293, lon: 1.3678 },
+            EDDF: { icao: "EDDF", iata: "FRA", city: "Francfort-sur-le-Main", lat: 50.0379, lon: 8.5622 },
+            EGLL: { icao: "EGLL", iata: "LHR", city: "Londres Heathrow", lat: 51.4700, lon: -0.4543 },
+            KJFK: { icao: "KJFK", iata: "JFK", city: "New York JFK", lat: 40.6413, lon: -73.7781 },
+            ZSPD: { icao: "ZSPD", iata: "PVG", city: "Shanghai Pudong", lat: 31.1443, lon: 121.8083 },
+            RJTT: { icao: "RJTT", iata: "HND", city: "Tokyo Haneda", lat: 35.5494, lon: 139.7798 },
+            OMDB: { icao: "OMDB", iata: "DXB", city: "Dubaï International", lat: 25.2532, lon: 55.3657 },
+            WSSS: { icao: "WSSS", iata: "SIN", city: "Singapour Changi", lat: 1.3644, lon: 103.9915 },
+            SBGR: { icao: "SBGR", iata: "GRU", city: "São Paulo Guarulhos", lat: -23.4356, lon: -46.4731 }
+        };
+
+        // Trajectoires ATS réalistes multi-waypoints (évitant un simple trait orthodromique)
+        const PRESET_ROUTES = {
+            PVG_FRA: {
+                dep: "ZSPD", arr: "EDDF", distanceKm: 9380,
+                waypoints: [
+                    { name: "ZSPD (Shanghai)", lat: 31.14, lon: 121.80, fir: "ZSHA", time: "T+00:00", alt: "SOL" },
+                    { name: "PIKAS (Montée FL320)", lat: 34.80, lon: 114.50, fir: "ZBPE", time: "T+01:05", alt: "FL320" },
+                    { name: "GOBIN (Corridor Hexi)", lat: 40.90, lon: 94.20, fir: "ZWUQ", time: "T+03:20", alt: "FL340" },
+                    { name: "SARIN (Frontière KZ)", lat: 44.30, lon: 74.00, fir: "UAAA", time: "T+05:10", alt: "FL360" },
+                    { name: "AKT (Mer Caspienne)", lat: 41.20, lon: 50.10, fir: "UBBA", time: "T+07:15", alt: "FL360" },
+                    { name: "SINOP (Mer Noire / Turquie)", lat: 41.50, lon: 35.10, fir: "LTAA", time: "T+08:55", alt: "FL380" },
+                    { name: "SUBIX (Entrée UE)", lat: 48.80, lon: 14.50, fir: "EDGG", time: "T+10:40", alt: "FL380" },
+                    { name: "EDDF (Francfort)", lat: 50.04, lon: 8.56, fir: "EDGG", time: "T+11:35", alt: "SOL" }
+                ]
+            },
+            CDG_HND: {
+                dep: "LFPG", arr: "RJTT", distanceKm: 10840,
+                waypoints: [
+                    { name: "LFPG (Paris CDG)", lat: 49.01, lon: 2.55, fir: "LFFF", time: "T+00:00", alt: "SOL" },
+                    { name: "TUNOD (Allemagne Sud)", lat: 48.20, lon: 11.50, fir: "EDGG", time: "T+01:00", alt: "FL330" },
+                    { name: "DINRO (Corridor Anatolie)", lat: 40.40, lon: 33.50, fir: "LTAA", time: "T+03:15", alt: "FL350" },
+                    { name: "BARUS (Caucase / Bakou)", lat: 40.30, lon: 49.80, fir: "UBBA", time: "T+04:50", alt: "FL350" },
+                    { name: "ODIVA (Kazakhstan)", lat: 43.50, lon: 68.00, fir: "UAAA", time: "T+06:40", alt: "FL370" },
+                    { name: "KAMUD (Entrée Chine Ouest)", lat: 43.80, lon: 87.60, fir: "ZWUQ", time: "T+08:25", alt: "FL370" },
+                    { name: "INTIK (Pékin FIR)", lat: 39.50, lon: 116.40, fir: "ZBPE", time: "T+10:45", alt: "FL390" },
+                    { name: "SADLI (Mer Jaune)", lat: 33.80, lon: 124.00, fir: "ZSHA", time: "T+11:45", alt: "FL390" },
+                    { name: "ATOTI (Entrée Japon MIC)", lat: 33.50, lon: 130.50, fir: "RJJJ", time: "T+12:25", alt: "FL390" },
+                    { name: "RJTT (Tokyo Haneda)", lat: 35.55, lon: 139.78, fir: "RJJJ", time: "T+13:30", alt: "SOL" }
+                ]
+            },
+            JFK_LHR: {
+                dep: "KJFK", arr: "EGLL", distanceKm: 5560,
+                waypoints: [
+                    { name: "KJFK (New York)", lat: 40.64, lon: -73.78, fir: "KZNY", time: "T+00:00", alt: "SOL" },
+                    { name: "DOVEY (Sortie Côte Est)", lat: 42.80, lon: -65.00, fir: "KZNY", time: "T+00:55", alt: "FL350" },
+                    { name: "SUPRY (NAT Track Alpha)", lat: 48.50, lon: -50.00, fir: "CZQX", time: "T+02:20", alt: "FL370" },
+                    { name: "30W (Limites Shanwick)", lat: 53.00, lon: -30.00, fir: "EGGX", time: "T+04:10", alt: "FL390" },
+                    { name: "MALOT (Entrée Irlande/UK)", lat: 53.00, lon: -12.00, fir: "EGGX", time: "T+05:30", alt: "FL390" },
+                    { name: "EGLL (Londres Heathrow)", lat: 51.47, lon: -0.45, fir: "EGTT", time: "T+06:35", alt: "SOL" }
+                ]
+            },
+            TLS_JFK: {
+                dep: "LFBO", arr: "KJFK", distanceKm: 5890,
+                waypoints: [
+                    { name: "LFBO (Toulouse-Blagnac)", lat: 43.63, lon: 1.37, fir: "LFBB", time: "T+00:00", alt: "SOL" },
+                    { name: "SECHE (Golfe de Gascogne)", lat: 46.20, lon: -4.00, fir: "LFBB", time: "T+00:45", alt: "FL340" },
+                    { name: "BEDRA (Entrée Océanique)", lat: 49.00, lon: -15.00, fir: "EGGX", time: "T+02:00", alt: "FL360" },
+                    { name: "45W (Atlantique Nord)", lat: 48.00, lon: -45.00, fir: "CZQX", time: "T+04:30", alt: "FL380" },
+                    { name: "OWENZ (Approche Est US)", lat: 41.20, lon: -70.00, fir: "KZNY", time: "T+06:40", alt: "FL380" },
+                    { name: "KJFK (New York)", lat: 40.64, lon: -73.78, fir: "KZNY", time: "T+07:25", alt: "SOL" }
+                ]
+            },
+            DXB_SIN: {
+                dep: "OMDB", arr: "WSSS", distanceKm: 5845,
+                waypoints: [
+                    { name: "OMDB (Dubaï)", lat: 25.25, lon: 55.37, fir: "OMAE", time: "T+00:00", alt: "SOL" },
+                    { name: "KITAL (Mer d'Oman)", lat: 20.50, lon: 64.00, fir: "VABF", time: "T+01:25", alt: "FL350" },
+                    { name: "PBG (Traversée Inde DGCA)", lat: 13.50, lon: 78.00, fir: "VABF", time: "T+03:30", alt: "FL370" },
+                    { name: "IGOGU (Détroit de Malacca)", lat: 6.00, lon: 98.00, fir: "WSJC", time: "T+05:45", alt: "FL390" },
+                    { name: "WSSS (Singapour Changi)", lat: 1.36, lon: 103.99, fir: "WSJC", time: "T+07:05", alt: "SOL" }
+                ]
+            },
+            FRA_GRU: {
+                dep: "EDDF", arr: "SBGR", distanceKm: 9810,
+                waypoints: [
+                    { name: "EDDF (Francfort)", lat: 50.04, lon: 8.56, fir: "EDGG", time: "T+00:00", alt: "SOL" },
+                    { name: "LIMGO (Traversée France)", lat: 47.00, lon: 3.00, fir: "LFFF", time: "T+00:55", alt: "FL330" },
+                    { name: "PAMPA (Sortie Sud-Ouest)", lat: 43.00, lon: -2.00, fir: "LFBB", time: "T+01:35", alt: "FL350" },
+                    { name: "NANIK (Atlantique Sud)", lat: -5.00, lon: -32.00, fir: "SBRE", time: "T+08:20", alt: "FL370" },
+                    { name: "SBGR (São Paulo)", lat: -23.44, lon: -46.47, fir: "SBRE", time: "T+11:45", alt: "SOL" }
+                ]
+            }
+        };
+
+        /*************************************************************************
+         * 5. ÉTAT GLOBAL DE L'APPLICATION
+         *************************************************************************/
+        let APP_STATE = {
+            lang: 'fr',
+            activeTab: 'REG',        // 'REG' ou 'FP'
+            altitudeMode: 'G2G',     // 'G2G' (Sol inclus) ou 'FL100' (> 10 000 ft)
+            bandFilter: 'ALL',       // 'ALL', 'NO24', '5G', '6G'
+            selectedJurKey: 'EU',
+            selectedIsoLabel: 'FRA / DEU / ESP...',
+            activeRouteKey: 'PVG_FRA',
+            currentRouteWaypoints: [],
+            flightProgressPct: 40
+        };
+
+        // Références Leaflet pour les 2 cartes (Onglet 1 et Onglet 2)
+        let mapReg = null;
+        let mapFp = null;
+        let regBaseLayer = null;
+        let fpBaseLayer = null;
+        let countryGeoJsonLayer = null;
+        let fpFirLayerGroup = null;
+        let fpRouteLayerGroup = null;
+        let fpAircraftMarker = null;
+
+        const BASEMAP_URLS = {
+            ESRI_LIGHT: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            ESRI_DARK:  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            OSM_STD:    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        };
+
+        /*************************************************************************
+         * 6. INITIALISATION DES DEUX CARTES LEAFLET & GÉOMÉTRIES
+         *************************************************************************/
+        window.addEventListener('DOMContentLoaded', () => {
+            populateAirportSelects();
+            initRegulationMap();
+            initFlightPlannerMap();
+            renderInspectorPanel();
+            loadPresetRoute('PVG_FRA');
+        });
+
+        function createTileLayer(basemapKey) {
+            if (basemapKey === 'OFFLINE_GRID') {
+                return createOfflineVectorGrid();
+            }
+            const url = BASEMAP_URLS[basemapKey] || BASEMAP_URLS.ESRI_LIGHT;
+            const layer = L.tileLayer(url, {
+                maxZoom: 10,
+                minZoom: 2,
+                attribution: 'Esri / OpenStreetMap'
+            });
+            let errCount = 0;
+            layer.on('tileerror', () => {
+                errCount++;
+                if (errCount > 10 && document.getElementById('basemap-select').value !== 'OFFLINE_GRID') {
+                    document.getElementById('basemap-select').value = 'OFFLINE_GRID';
+                    switchBasemap('OFFLINE_GRID');
+                }
+            });
+            return layer;
+        }
+
+        function createOfflineVectorGrid() {
+            const grp = L.layerGroup();
+            for (let lat = -60; lat <= 80; lat += 20) {
+                L.polyline([[lat, -180], [lat, 180]], { color: '#CBD5E1', weight: 1, dashArray: '4,4', interactive: false }).addTo(grp);
+            }
+            for (let lon = -160; lon <= 180; lon += 20) {
+                L.polyline([[-80, lon], [85, lon]], { color: '#CBD5E1', weight: 1, dashArray: '4,4', interactive: false }).addTo(grp);
+            }
+            return grp;
+        }
+
+        function switchBasemap(key) {
+            if (mapReg && regBaseLayer) {
+                mapReg.removeLayer(regBaseLayer);
+                regBaseLayer = createTileLayer(key).addTo(mapReg);
+                if (regBaseLayer.bringToBack) regBaseLayer.bringToBack();
+            }
+            if (mapFp && fpBaseLayer) {
+                mapFp.removeLayer(fpBaseLayer);
+                fpBaseLayer = createTileLayer(key).addTo(mapFp);
+                if (fpBaseLayer.bringToBack) fpBaseLayer.bringToBack();
+            }
+        }
+
+        function initRegulationMap() {
+            mapReg = L.map('map-reg', {
+                center: [30, 18],
+                zoom: 2,
+                minZoom: 2,
+                maxZoom: 8,
+                worldCopyJump: true
+            });
+
+            regBaseLayer = createTileLayer('ESRI_LIGHT').addTo(mapReg);
+
+            // Chargement immédiat des polygones embarqués puis enrichissement GeoJSON haute définition
+            renderCountriesGeoJson(getEmbeddedWorldGeoJson());
+
+            fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+                .then(res => res.ok ? res.json() : Promise.reject())
+                .then(geoData => renderCountriesGeoJson(geoData))
+                .catch(() => {});
+        }
+
+        function renderCountriesGeoJson(geoJsonData) {
+            if (countryGeoJsonLayer) {
+                mapReg.removeLayer(countryGeoJsonLayer);
+            }
+            countryGeoJsonLayer = L.geoJSON(geoJsonData, {
+                style: feature => getCountryPolygonStyle(feature),
+                onEachFeature: (feature, layer) => {
+                    layer.on({
+                        mouseover: e => {
+                            e.target.setStyle({ weight: 2.2, color: '#0284C7', fillOpacity: 0.72 });
+                        },
+                        mouseout: e => {
+                            countryGeoJsonLayer.resetStyle(e.target);
+                        },
+                        click: () => {
+                            const iso = feature.id || (feature.properties && feature.properties.iso_a3) || "FRA";
+                            const cName = (feature.properties && feature.properties.name) || iso;
+                            const jurKey = ISO_TO_JUR[iso] || "EU";
+                            APP_STATE.selectedJurKey = jurKey;
+                            APP_STATE.selectedIsoLabel = `${cName} (${iso})`;
+                            document.getElementById('quick-country-select').value = jurKey;
+                            renderInspectorPanel();
+                            countryGeoJsonLayer.setStyle(f => getCountryPolygonStyle(f));
+                        }
+                    });
+                }
+            }).addTo(mapReg);
+        }
+
+        function getCountryPolygonStyle(feature) {
+            const iso = feature.id || (feature.properties && feature.properties.iso_a3) || "";
+            const jurKey = ISO_TO_JUR[iso];
+            const isSelected = jurKey && jurKey === APP_STATE.selectedJurKey;
+
+            if (!jurKey) {
+                return {
+                    fillColor: '#CBD5E1',
+                    weight: 0.7,
+                    color: '#94A3B8',
+                    fillOpacity: 0.35
+                };
+            }
+
+            const statusColor = evaluateJurisdictionMapColor(jurKey);
+            return {
+                fillColor: statusColor,
+                weight: isSelected ? 2.2 : 1.0,
+                color: isSelected ? '#0F172A' : '#FFFFFF',
+                fillOpacity: isSelected ? 0.68 : 0.50
+            };
+        }
+
+        function evaluateJurisdictionMapColor(jurKey) {
+            const jur = JURISDICTIONS[jurKey];
+            const isG2G = APP_STATE.altitudeMode === 'G2G';
+            const filter = APP_STATE.bandFilter;
+
+            const check = (bKey) => isG2G ? jur.bands[bKey].g2g : jur.bands[bKey].fl100;
+
+            const has24 = check('ISM24');
+            const hasU1 = check('UNII1');
+            const hasU3 = check('UNII3');
+            const has6G = check('UNII5') || check('UNII6_8');
+
+            if (filter === '6G') {
+                if (jur.bands.UNII5.g2g && jur.bands.UNII6_8.g2g) return '#10B981'; // Emerald (Full 6G)
+                if (has6G) return '#0EA5E9'; // Sky (Lower 6G LPI)
+                return '#EF4444'; // Rose (Interdit en 6 GHz)
+            }
+
+            if (filter === '5G') {
+                if (hasU1 && hasU3) return '#0EA5E9';
+                if (hasU1 || hasU3) return '#F59E0B';
+                return '#EF4444';
+            }
+
+            // En mode Gate-to-Gate, si le pays interdit l'émission au sol (Chine, Inde, Russie sur 5G)
+            if (!has24 && !hasU1 && !hasU3 && !has6G) {
+                return '#EF4444'; // Coupé au sol / Interdit
+            }
+
+            // Spectre large 5G + 6G complet (USA, Canada FL100)
+            if (hasU1 && hasU3 && jur.bands.UNII6_8.fl100 && has6G) {
+                return '#10B981'; // Emerald
+            }
+
+            // Spectre modéré / UE Janvier 2029 (U-NII-1 + U-NII-3 ou 6G Bas sans DFS)
+            if ((hasU1 && has6G) || (hasU1 && hasU3)) {
+                return '#0EA5E9'; // Sky Blue
+            }
+
+            // Spectre restreint (Chine >3000m : U-NII-3 uniquement)
+            return '#F59E0B'; // Amber
+        }
+
+        /*************************************************************************
+         * 7. RENDU DU PANNEAU D'INSPECTION & MATRICE INDIVIDUELLE DES CANAUX
+         *************************************************************************/
+        function selectCountryByJurKey(jurKey) {
+            APP_STATE.selectedJurKey = jurKey;
+            APP_STATE.selectedIsoLabel = JURISDICTIONS[jurKey].isoList.slice(0, 4).join(' / ');
+            renderInspectorPanel();
+            if (countryGeoJsonLayer) {
+                countryGeoJsonLayer.setStyle(f => getCountryPolygonStyle(f));
+            }
+        }
+
+        function setAltitudeMode(mode) {
+            APP_STATE.altitudeMode = mode;
+            const btnG2G = document.getElementById('btn-alt-g2g');
+            const btnFL100 = document.getElementById('btn-alt-fl100');
+
+            if (mode === 'G2G') {
+                btnG2G.className = "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all bg-white text-sky-700 shadow-sm border border-slate-200";
+                btnFL100.className = "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-600 hover:text-slate-900";
+            } else {
+                btnFL100.className = "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all bg-white text-sky-700 shadow-sm border border-slate-200";
+                btnG2G.className = "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all text-slate-600 hover:text-slate-900";
+            }
+
+            renderInspectorPanel();
+            if (countryGeoJsonLayer) {
+                countryGeoJsonLayer.setStyle(f => getCountryPolygonStyle(f));
+            }
+        }
+
+        function setBandFilter(filterKey) {
+            APP_STATE.bandFilter = filterKey;
+            ['ALL', 'NO24', '5G', '6G'].forEach(k => {
+                const btn = document.getElementById('btn-band-' + k);
+                if (k === filterKey) {
+                    btn.className = "px-3 py-1.5 rounded-md bg-white text-sky-700 font-semibold shadow-sm border border-slate-200";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900";
+                }
+            });
+
+            renderInspectorPanel();
+            if (countryGeoJsonLayer) {
+                countryGeoJsonLayer.setStyle(f => getCountryPolygonStyle(f));
+            }
+        }
+
+        function isBandAllowedByFilter(bandGroup) {
+            const f = APP_STATE.bandFilter;
+            if (f === 'ALL') return true;
+            if (f === 'NO24') return bandGroup !== '2.4G';
+            if (f === '5G') return bandGroup === '5G';
+            if (f === '6G') return bandGroup === '6G';
+            return true;
+        }
+
+        function renderInspectorPanel() {
+            const lang = APP_STATE.lang;
+            const t = I18N[lang];
+            const jur = JURISDICTIONS[APP_STATE.selectedJurKey];
+            const isG2G = APP_STATE.altitudeMode === 'G2G';
+
+            // En-tête fiche pays
+            document.getElementById('insp-badge-code').textContent = jur.code;
+            document.getElementById('insp-country-name').textContent = jur.name[lang];
+            document.getElementById('insp-iso-tag').textContent = APP_STATE.selectedIsoLabel;
+            document.getElementById('insp-authority').textContent = jur.authority;
+            document.getElementById('insp-notes').textContent = jur.notes[lang];
+            document.getElementById('insp-active-phase-badge').textContent = isG2G ? t.modeG2GText : t.modeFL100Text;
+
+            // Badge statut global du pays selon l'altitude
+            const globalPill = document.getElementById('insp-global-pill');
+            const anyG2G = Object.values(jur.bands).some(b => b.g2g);
+            if (isG2G && !anyG2G) {
+                globalPill.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 shrink-0";
+                globalPill.innerHTML = `<i class="fa-solid fa-ban mr-1.5"></i>${t.statusGroundBan}`;
+            } else if (!anyG2G && !isG2G) {
+                globalPill.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 shrink-0";
+                globalPill.innerHTML = `<i class="fa-solid fa-cloud mr-1.5"></i>${t.statusFL100Only}`;
+            } else {
+                globalPill.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0";
+                globalPill.innerHTML = `<i class="fa-solid fa-circle-check mr-1.5"></i>${t.statusG2GOk}`;
+            }
+
+            // 1. Rendu des cartes de synthèse par Sous-Bande
+            const subbandContainer = document.getElementById('subband-cards-container');
+            subbandContainer.innerHTML = '';
+
+            // 2. Rendu de la matrice individuelle des canaux
+            const matrixContainer = document.getElementById('individual-channels-container');
+            matrixContainer.innerHTML = '';
+
+            let totalActive = 0;
+            let totalBanned = 0;
+            let totalFiltered = 0;
+
+            CHANNEL_CATALOG.forEach(cat => {
+                const bRule = jur.bands[cat.key];
+                const permittedAtAltitude = isG2G ? bRule.g2g : bRule.fl100;
+                const passesFilter = isBandAllowedByFilter(cat.bandGroup);
+
+                // Carte de sous-bande
+                let badgeClass = "";
+                let badgeLabel = "";
+                let cardBorder = "";
+
+                if (!passesFilter) {
+                    badgeClass = "bg-slate-100 text-slate-500 border-slate-200";
+                    badgeLabel = t.chLegFilt;
+                    cardBorder = "border-slate-200 opacity-60 bg-slate-50";
+                } else if (permittedAtAltitude) {
+                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    badgeLabel = bRule.eirp;
+                    cardBorder = "border-emerald-200 bg-emerald-50/20";
+                } else {
+                    badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
+                    badgeLabel = bRule.eirp;
+                    cardBorder = "border-rose-200 bg-rose-50/20";
+                }
+
+                const subCard = document.createElement('div');
+                subCard.className = `p-3 rounded-lg border ${cardBorder} flex items-center justify-between transition`;
+                subCard.innerHTML = `
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold text-slate-800">${cat.title}</span>
+                            <span class="text-[11px] font-mono text-slate-500">(${cat.channels.length} ch)</span>
+                        </div>
+                        <div class="text-[11px] font-mono text-slate-500 mt-0.5">${cat.freqRange}</div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded text-[11px] font-mono font-semibold border ${badgeClass}">
+                        ${badgeLabel}
+                    </span>
+                `;
+                subbandContainer.appendChild(subCard);
+
+                // Rangée de canaux individuels
+                const chSection = document.createElement('div');
+                chSection.className = "p-3.5 rounded-xl bg-slate-50 border border-slate-200/90";
+
+                const mandatePill = cat.mandateTag
+                    ? `<span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">${cat.mandateTag}</span>`
+                    : '';
+
+                let pillsHtml = '';
+                cat.channels.forEach(chNum => {
+                    const isPsc = cat.pscChannels && cat.pscChannels.includes(chNum);
+                    let pillStyle = "";
+                    let iconHtml = "";
+
+                    if (!passesFilter) {
+                        totalFiltered++;
+                        pillStyle = "bg-slate-200/70 text-slate-400 border-slate-300";
+                    } else if (permittedAtAltitude) {
+                        totalActive++;
+                        pillStyle = isPsc
+                            ? "bg-emerald-600 text-white border-emerald-700 shadow-sm ring-2 ring-emerald-300/60"
+                            : "bg-emerald-500 text-white border-emerald-600 shadow-sm";
+                        iconHtml = `<i class="fa-solid fa-check text-[9px] mr-1 opacity-90"></i>`;
+                    } else {
+                        totalBanned++;
+                        pillStyle = "bg-rose-50 text-rose-600 border-rose-200 line-through decoration-rose-500";
+                        iconHtml = `<i class="fa-solid fa-xmark text-[9px] mr-1 text-rose-500"></i>`;
+                    }
+
+                    pillsHtml += `
+                        <div class="channel-pill px-2.5 py-1 rounded-md border font-mono text-xs font-semibold flex items-center justify-center ${pillStyle}"
+                             title="${cat.title} — Canal ${chNum}${isPsc ? ' (PSC 6 GHz)' : ''}">
+                            ${iconHtml}<span>${chNum}</span>
+                        </div>
+                    `;
+                });
+
+                chSection.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold text-slate-800">${cat.title}</span>
+                            <span class="text-xs font-mono text-slate-500">${cat.freqRange}</span>
+                            ${mandatePill}
+                        </div>
+                        <span class="text-[11px] font-mono font-medium ${!passesFilter ? 'text-slate-400' : (permittedAtAltitude ? 'text-emerald-700' : 'text-rose-600')}">
+                            ${!passesFilter ? t.chLegFilt : (permittedAtAltitude ? '● ' + t.chLegOn + ' (' + bRule.eirp + ')' : '✕ ' + t.chLegOff)}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${pillsHtml}
+                    </div>
+                `;
+                matrixContainer.appendChild(chSection);
+            });
+
+            // Mise à jour des compteurs de canaux
+            document.getElementById('stat-count-active').textContent = totalActive;
+            document.getElementById('stat-count-banned').textContent = totalBanned;
+            document.getElementById('stat-count-filtered').textContent = totalFiltered;
+        }
+
+        /*************************************************************************
+         * 8. ONGLET 2 : PLANIFICATEUR DE VOL, CARTE DES FIR & TIMELINE CWLU
+         *************************************************************************/
+        function populateAirportSelects() {
+            const depSel = document.getElementById('dep-airport-select');
+            const arrSel = document.getElementById('arr-airport-select');
+            depSel.innerHTML = '';
+            arrSel.innerHTML = '';
+
+            Object.values(AIRPORTS).forEach(ap => {
+                const label = `${ap.iata} — ${ap.city} (${ap.icao})`;
+                depSel.add(new Option(label, ap.icao));
+                arrSel.add(new Option(label, ap.icao));
+            });
+        }
+
+        function initFlightPlannerMap() {
+            mapFp = L.map('map-fp', {
+                center: [38, 60],
+                zoom: 3,
+                minZoom: 2,
+                maxZoom: 8,
+                worldCopyJump: true
+            });
+
+            fpBaseLayer = createTileLayer('ESRI_LIGHT').addTo(mapFp);
+            fpFirLayerGroup = L.layerGroup().addTo(mapFp);
+            fpRouteLayerGroup = L.layerGroup().addTo(mapFp);
+
+            drawAllFirPolygons();
+        }
+
+        function drawAllFirPolygons(intersectedFirIds = []) {
+            if (!fpFirLayerGroup) return;
+            fpFirLayerGroup.clearLayers();
+
+            FIR_DATABASE.forEach(fir => {
+                const isHit = intersectedFirIds.includes(fir.id);
+                const polyColor = fir.jur === 'CN'
+                    ? '#F59E0B'
+                    : (fir.jur === 'JP' ? '#8B5CF6' : (fir.jur === 'US' || fir.jur === 'CA' ? '#10B981' : '#0284C7'));
+
+                const rect = L.polygon(fir.poly, {
+                    color: isHit ? polyColor : '#94A3B8',
+                    weight: isHit ? 2.0 : 1.0,
+                    dashArray: isHit ? null : '4,4',
+                    fillColor: polyColor,
+                    fillOpacity: isHit ? 0.16 : 0.04
+                }).addTo(fpFirLayerGroup);
+
+                rect.bindTooltip(`${fir.id} • ${fir.name}`, {
+                    permanent: isHit,
+                    direction: 'center',
+                    className: 'fir-label-tooltip'
+                });
+            });
+        }
+
+        function loadPresetRoute(routeKey) {
+            APP_STATE.activeRouteKey = routeKey;
+            const preset = PRESET_ROUTES[routeKey];
+            if (!preset) return;
+
+            document.getElementById('dep-airport-select').value = preset.dep;
+            document.getElementById('arr-airport-select').value = preset.arr;
+
+            APP_STATE.currentRouteWaypoints = preset.waypoints;
+            renderFlightRouteAndTimeline(preset.waypoints, preset.distanceKm);
+        }
+
+        function computeCustomRoute() {
+            const depIcao = document.getElementById('dep-airport-select').value;
+            const arrIcao = document.getElementById('arr-airport-select').value;
+
+            // Vérifie si la paire correspond à une route prédéfinie
+            for (const [k, r] of Object.entries(PRESET_ROUTES)) {
+                if (r.dep === depIcao && r.arr === arrIcao) {
+                    document.getElementById('preset-route-select').value = k;
+                    loadPresetRoute(k);
+                    return;
+                }
+            }
+
+            // Sinon, génère une route multi-waypoints réaliste avec déflexion de couloir ATS
+            const dep = AIRPORTS[depIcao];
+            const arr = AIRPORTS[arrIcao];
+            if (!dep || !arr) return;
+
+            const steps = 6;
+            const waypoints = [];
+            for (let i = 0; i <= steps; i++) {
+                const f = i / steps;
+                // Courbure simulant un routage ATS réaliste
+                const bend = Math.sin(f * Math.PI) * 7.5;
+                const lat = dep.lat + (arr.lat - dep.lat) * f + bend;
+                const lon = dep.lon + (arr.lon - dep.lon) * f;
+                const firId = detectFirForCoord(lat, lon);
+                const mins = Math.round(f * 540);
+                const hh = String(Math.floor(mins / 60)).padStart(2, '0');
+                const mm = String(mins % 60).padStart(2, '0');
+
+                waypoints.push({
+                    name: i === 0 ? `${dep.icao} (${dep.city})` : (i === steps ? `${arr.icao} (${arr.city})` : `WP-ATS${i}`),
+                    lat: Number(lat.toFixed(2)),
+                    lon: Number(lon.toFixed(2)),
+                    fir: firId,
+                    time: `T+${hh}:${mm}`,
+                    alt: (i === 0 || i === steps) ? "SOL" : "FL360"
+                });
+            }
+
+            const distKm = Math.round(calculateHaversineKm(dep.lat, dep.lon, arr.lat, arr.lon) * 1.07);
+            APP_STATE.currentRouteWaypoints = waypoints;
+            renderFlightRouteAndTimeline(waypoints, distKm);
+        }
+
+        function detectFirForCoord(lat, lon) {
+            for (const fir of FIR_DATABASE) {
+                const lats = fir.poly.map(p => p[0]);
+                const lons = fir.poly.map(p => p[1]);
+                if (lat >= Math.min(...lats) && lat <= Math.max(...lats) &&
+                    lon >= Math.min(...lons) && lon <= Math.max(...lons)) {
+                    return fir.id;
+                }
+            }
+            if (lon > 74 && lon < 126 && lat > 22 && lat < 48) return "ZBPE";
+            if (lon >= 126) return "RJJJ";
+            if (lon < -30) return "KZNY";
+            return "EDGG";
+        }
+
+        function calculateHaversineKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function renderFlightRouteAndTimeline(waypoints, distanceKm) {
+            if (!fpRouteLayerGroup) return;
+            fpRouteLayerGroup.clearLayers();
+
+            // Extraction de la séquence unique des FIR traversées
+            const firSequence = [];
+            waypoints.forEach(wp => {
+                if (firSequence.length === 0 || firSequence[firSequence.length - 1].firId !== wp.fir) {
+                    const firObj = FIR_DATABASE.find(f => f.id === wp.fir) || FIR_DATABASE[0];
+                    firSequence.push({
+                        firId: firObj.id,
+                        firName: firObj.name,
+                        jur: firObj.jur,
+                        entryWp: wp.name,
+                        entryTime: wp.time,
+                        lat: wp.lat,
+                        lon: wp.lon,
+                        activeSummary: firObj.activeSummary,
+                        bannedSummary: firObj.bannedSummary
+                    });
+                }
+            });
+
+            // Mise en évidence des FIR traversées sur la carte
+            drawAllFirPolygons(firSequence.map(f => f.firId));
+
+            // Tracé de la trajectoire multi-waypoints
+            const coords = waypoints.map(w => [w.lat, w.lon]);
+            L.polyline(coords, {
+                color: '#0284C7',
+                weight: 4,
+                opacity: 0.9
+            }).addTo(fpRouteLayerGroup);
+
+            // Points de cheminement (Waypoints)
+            waypoints.forEach((wp, idx) => {
+                const isEndpoint = idx === 0 || idx === waypoints.length - 1;
+                const marker = L.circleMarker([wp.lat, wp.lon], {
+                    radius: isEndpoint ? 7 : 5,
+                    fillColor: isEndpoint ? '#0F172A' : '#0284C7',
+                    color: '#FFFFFF',
+                    weight: 2,
+                    fillOpacity: 1
+                }).addTo(fpRouteLayerGroup);
+
+                marker.bindTooltip(`<strong>${wp.name}</strong><br/>FIR: ${wp.fir} • ${wp.time}`, {
+                    direction: 'top',
+                    className: 'wp-tooltip'
+                });
+            });
+
+            // Statistiques de la barre supérieure
+            document.getElementById('fp-stat-distance').textContent = `${distanceKm.toLocaleString()} km`;
+            document.getElementById('fp-stat-firs').textContent = firSequence.length;
+
+            // Calcul des commutations et rendu des cartes de la Timeline FIR
+            renderFirTimelineCards(firSequence);
+
+            // Positionnement du marqueur avion
+            updateAircraftProgress(APP_STATE.flightProgressPct);
+
+            // Ajustement automatique de la vue carte si l'onglet 2 est visible
+            if (APP_STATE.activeTab === 'FP') {
+                mapFp.fitBounds(coords, { padding: [45, 45] });
+            }
+        }
+
+        function computeCwluSwitchActions(prevJurKey, currJurKey) {
+            const lang = APP_STATE.lang;
+            const t = I18N[lang];
+
+            if (!prevJurKey) {
+                return {
+                    changed: true,
+                    badge: "INIT CWLU",
+                    badgeStyle: "bg-sky-100 text-sky-800 border-sky-200",
+                    enableText: `${t.cardEnable} : Profil initial ${currJurKey}`,
+                    cutText: `Coupure stricte U-NII-2A/2C (Canaux 52–144)`
+                };
+            }
+
+            if (prevJurKey === currJurKey) {
+                return {
+                    changed: false,
+                    badge: t.cardMaintain,
+                    badgeStyle: "bg-slate-100 text-slate-600 border-slate-200",
+                    enableText: "Continuité spectrale entre ces deux FIR",
+                    cutText: "Aucune coupure de canal requise"
+                };
+            }
+
+            // Transition vers la Chine (MIIT Notice 129)
+            if (currJurKey === 'CN') {
+                return {
+                    changed: true,
+                    badge: "MIIT 129 SWITCH",
+                    badgeStyle: "bg-amber-100 text-amber-800 border-amber-300",
+                    enableText: `${t.cardEnable} : U-NII-3 (Canaux 149–165) > 3000m`,
+                    cutText: `${t.cardCut} : U-NII-1 (36–48) & Tout 6 GHz (1–225)`
+                };
+            }
+
+            // Transition de la Chine vers le Japon (Inversion complète U-NII-3 vs U-NII-1/6G)
+            if (prevJurKey === 'CN' && currJurKey === 'JP') {
+                return {
+                    changed: true,
+                    badge: "INVERSION CN ➔ JP",
+                    badgeStyle: "bg-rose-100 text-rose-800 border-rose-300",
+                    enableText: `${t.cardEnable} : U-NII-1 (36–48) & 6 GHz LPI (1–93)`,
+                    cutText: `${t.cardCut} : U-NII-3 (Canaux 149–165 interdits au Japon)`
+                };
+            }
+
+            // Transition de la Chine vers l'Asie Centrale / Eurasie
+            if (prevJurKey === 'CN' && currJurKey === 'RU') {
+                return {
+                    changed: true,
+                    badge: "SORTIE CHINE",
+                    badgeStyle: "bg-emerald-100 text-emerald-800 border-emerald-300",
+                    enableText: `${t.cardEnable} : U-NII-1 (Canaux 36–48) + U-NII-3`,
+                    cutText: `Maintenir 6 GHz désactivé`
+                };
+            }
+
+            // Entrée dans l'espace UE / UK / AE / SG / BR (Activation 6 GHz LPI U-NII-5)
+            if (['EU', 'UK', 'AE', 'SG', 'BR'].includes(currJurKey)) {
+                return {
+                    changed: true,
+                    badge: "ACTIVATION 6 GHz LPI",
+                    badgeStyle: "bg-emerald-100 text-emerald-800 border-emerald-300",
+                    enableText: `${t.cardEnable} : 6 GHz Bas LPI (Canaux 1–93) + U-NII-1`,
+                    cutText: `${t.cardCut} : Canaux DFS 52–144 (Mandat UE 2029)`
+                };
+            }
+
+            // Entrée USA / Canada (Activation 6 GHz Complet U-NII-5 à 8)
+            if (['US', 'CA'].includes(currJurKey)) {
+                return {
+                    changed: true,
+                    badge: "FULL 6 GHz (1200 MHz)",
+                    badgeStyle: "bg-emerald-100 text-emerald-800 border-emerald-300",
+                    enableText: `${t.cardEnable} : 6 GHz Complet (Canaux 1–225) + U-NII-3 (1W)`,
+                    cutText: `Maintenir U-NII-2A/2C désactivés`
+                };
+            }
+
+            // Entrée espace Eurasie / Inde (Coupure 6 GHz)
+            return {
+                changed: true,
+                badge: "COUPURE 6 GHz",
+                badgeStyle: "bg-amber-100 text-amber-800 border-amber-300",
+                enableText: `${t.cardEnable} : 5 GHz U-NII-1 (36–48) & U-NII-3 (149–165)`,
+                cutText: `${t.cardCut} : Bande 6 GHz (Canaux 1–225)`
+            };
+        }
+
+        function renderFirTimelineCards(firSequence) {
+            const container = document.getElementById('fir-timeline-cards');
+            container.innerHTML = '';
+
+            let switchCount = 0;
+
+            firSequence.forEach((step, index) => {
+                const prevJur = index > 0 ? firSequence[index - 1].jur : null;
+                const diff = computeCwluSwitchActions(prevJur, step.jur);
+                if (index > 0 && diff.changed) switchCount++;
+
+                const card = document.createElement('div');
+                card.className = "min-w-[295px] max-w-[315px] bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-sky-400 hover:shadow-md transition cursor-pointer flex flex-col justify-between shrink-0";
+                card.onclick = () => {
+                    mapFp.setView([step.lat, step.lon], 4, { animate: true });
+                };
+
+                card.innerHTML = `
+                    <div>
+                        <!-- En-tête de l'étape FIR -->
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-6 h-6 rounded-full bg-slate-900 text-white font-mono text-xs font-bold flex items-center justify-center">${index + 1}</span>
+                                <span class="font-mono font-bold text-sm text-sky-700">${step.firId}</span>
+                                <span class="text-xs font-semibold text-slate-700 truncate">${step.firName}</span>
+                            </div>
+                            <span class="font-mono text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">${step.entryTime}</span>
+                        </div>
+
+                        <!-- Waypoint d'entrée & Badge de commutation -->
+                        <div class="flex items-center justify-between text-[11px] mb-3 pb-2 border-b border-slate-100">
+                            <span class="text-slate-500 truncate"><i class="fa-solid fa-location-crosshairs text-sky-500 mr-1"></i>${step.entryWp}</span>
+                            <span class="font-mono font-bold text-[10px] px-2 py-0.5 rounded border ${diff.badgeStyle}">${diff.badge}</span>
+                        </div>
+
+                        <!-- Instructions de commutation CWLU -->
+                        <div class="space-y-1.5 text-xs">
+                            <div class="flex items-start space-x-1.5 text-emerald-700 bg-emerald-50/70 px-2.5 py-1.5 rounded-lg border border-emerald-200/80">
+                                <i class="fa-solid fa-circle-plus mt-0.5 shrink-0"></i>
+                                <span class="font-medium leading-snug">${diff.enableText}</span>
+                            </div>
+                            <div class="flex items-start space-x-1.5 text-rose-700 bg-rose-50/70 px-2.5 py-1.5 rounded-lg border border-rose-200/80">
+                                <i class="fa-solid fa-circle-minus mt-0.5 shrink-0"></i>
+                                <span class="font-medium leading-snug">${diff.cutText}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Canaux actifs dans la FIR -->
+                    <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+                        <span>Régime : <strong class="text-slate-700">${step.jur}</strong></span>
+                        <span class="truncate max-w-[190px]" title="${step.activeSummary}">${step.activeSummary}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            document.getElementById('fp-stat-switches').textContent = switchCount;
+        }
+
+        function updateAircraftProgress(pctValue) {
+            APP_STATE.flightProgressPct = Number(pctValue);
+            const wps = APP_STATE.currentRouteWaypoints;
+            if (!wps || wps.length < 2 || !mapFp) return;
+
+            const totalSegments = wps.length - 1;
+            const exactPos = (APP_STATE.flightProgressPct / 100) * totalSegments;
+            const segIdx = Math.min(Math.floor(exactPos), totalSegments - 1);
+            const segFrac = exactPos - segIdx;
+
+            const p1 = wps[segIdx];
+            const p2 = wps[segIdx + 1];
+            const curLat = p1.lat + (p2.lat - p1.lat) * segFrac;
+            const curLon = p1.lon + (p2.lon - p1.lon) * segFrac;
+            const activeFirId = segFrac < 0.5 ? p1.fir : p2.fir;
+            const firObj = FIR_DATABASE.find(f => f.id === activeFirId) || FIR_DATABASE[0];
+
+            if (fpAircraftMarker) {
+                mapFp.removeLayer(fpAircraftMarker);
+            }
+
+            const planeIcon = L.divIcon({
+                className: '',
+                html: `<div class="w-8 h-8 rounded-full bg-slate-900 text-sky-400 border-2 border-white shadow-lg flex items-center justify-center">
+                         <i class="fa-solid fa-plane text-xs"></i>
+                       </div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            fpAircraftMarker = L.marker([curLat, curLon], { icon: planeIcon }).addTo(mapFp);
+
+            document.getElementById('flight-active-fir-badge').textContent = `FIR: ${firObj.id}`;
+            document.getElementById('fp-live-fir-name').textContent = `${firObj.id} — ${firObj.name} (${firObj.jur})`;
+            document.getElementById('fp-live-fir-channels').textContent = `Actifs : ${firObj.activeSummary}`;
+        }
+
+        /*************************************************************************
+         * 9. NAVIGATION ENTRE LES DEUX GRANDS ONGLETS & LOCALISATION
+         *************************************************************************/
+        function switchMainTab(tabKey) {
+            APP_STATE.activeTab = tabKey;
+            const viewReg = document.getElementById('view-reg');
+            const viewFp = document.getElementById('view-fp');
+            const btnReg = document.getElementById('tab-btn-reg');
+            const btnFp = document.getElementById('tab-btn-fp');
+
+            if (tabKey === 'REG') {
+                viewReg.classList.remove('hidden');
+                viewFp.classList.add('hidden');
+                btnReg.className = "px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2.5 bg-sky-600 text-white shadow-sm";
+                btnFp.className = "px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2.5 text-slate-300 hover:text-white hover:bg-slate-700/70";
+                setTimeout(() => { if (mapReg) mapReg.invalidateSize(); }, 80);
+            } else {
+                viewFp.classList.remove('hidden');
+                viewReg.classList.add('hidden');
+                btnFp.className = "px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2.5 bg-sky-600 text-white shadow-sm";
+                btnReg.className = "px-5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2.5 text-slate-300 hover:text-white hover:bg-slate-700/70";
+                setTimeout(() => {
+                    if (mapFp) {
+                        mapFp.invalidateSize();
+                        const coords = APP_STATE.currentRouteWaypoints.map(w => [w.lat, w.lon]);
+                        if (coords.length > 1) mapFp.fitBounds(coords, { padding: [45, 45] });
+                    }
+                }, 80);
+            }
+        }
+
+        function setLanguage(lang) {
+            APP_STATE.lang = lang;
+            ['fr', 'en', 'de'].forEach(l => {
+                const btn = document.getElementById('lang-' + l);
+                btn.className = (l === lang)
+                    ? "px-2.5 py-1 rounded-md bg-sky-500 text-white"
+                    : "px-2.5 py-1 rounded-md text-slate-400 hover:text-white";
+            });
+
+            const t = I18N[lang];
+            document.getElementById('ui-app-subtitle').textContent = t.subtitle;
+            document.getElementById('ui-tab-1').textContent = t.tab1;
+            document.getElementById('ui-tab-2').textContent = t.tab2;
+            document.getElementById('ui-btn-mandates').textContent = t.btnMandates;
+            document.getElementById('ui-alt-label').innerHTML = `<i class="fa-solid fa-plane-up text-sky-600 mr-1.5"></i>${t.altLabel}`;
+            document.getElementById('ui-btn-g2g').textContent = t.btnG2G;
+            document.getElementById('ui-btn-fl100').textContent = t.btnFL100;
+            document.getElementById('ui-band-label').innerHTML = `<i class="fa-solid fa-wave-square text-sky-600 mr-1.5"></i>${t.bandLabel}`;
+            document.getElementById('btn-band-ALL').textContent = t.bandAll;
+            document.getElementById('btn-band-NO24').textContent = t.bandNo24;
+            document.getElementById('btn-band-5G').textContent = t.band5G;
+            document.getElementById('btn-band-6G').textContent = t.band6G;
+            document.getElementById('ui-legend-title').textContent = t.legendTitle;
+            document.getElementById('ui-legend-hint').innerHTML = `<i class="fa-solid fa-hand-pointer mr-1"></i>${t.legendHint}`;
+            document.getElementById('ui-leg-opt').textContent = t.legOpt;
+            document.getElementById('ui-leg-eu').textContent = t.legEu;
+            document.getElementById('ui-leg-rest').textContent = t.legRest;
+            document.getElementById('ui-leg-ban').textContent = t.legBan;
+            document.getElementById('ui-stat-active').textContent = t.statActive;
+            document.getElementById('ui-stat-banned').textContent = t.statBanned;
+            document.getElementById('ui-stat-filtered').textContent = t.statFiltered;
+            document.getElementById('ui-subband-title').textContent = t.subbandTitle;
+            document.getElementById('ui-channels-matrix-title').textContent = t.matrixTitle;
+            document.getElementById('ui-channels-matrix-desc').textContent = t.matrixDesc;
+            document.getElementById('ui-ch-leg-on').textContent = t.chLegOn;
+            document.getElementById('ui-ch-leg-off').textContent = t.chLegOff;
+            document.getElementById('ui-ch-leg-filt').textContent = t.chLegFilt;
+
+            // Onglet 2
+            document.getElementById('ui-fp-preset-label').textContent = t.fpPresetLabel;
+            document.getElementById('ui-fp-dep-label').textContent = t.fpDepLabel;
+            document.getElementById('ui-fp-arr-label').textContent = t.fpArrLabel;
+            document.getElementById('ui-fp-sim-label').textContent = t.fpSimLabel;
+            document.getElementById('ui-fp-dist-lbl').textContent = t.fpDistLbl;
+            document.getElementById('ui-fp-firs-lbl').textContent = t.fpFirsLbl;
+            document.getElementById('ui-fp-sw-lbl').textContent = t.fpSwLbl;
+            document.getElementById('ui-fp-curr-box-title').textContent = t.fpCurrBoxTitle;
+            document.getElementById('ui-timeline-heading').textContent = t.timelineHeading;
+            document.getElementById('ui-timeline-sub').textContent = t.timelineSub;
+
+            renderInspectorPanel();
+            if (APP_STATE.currentRouteWaypoints.length > 0) {
+                const dist = PRESET_ROUTES[APP_STATE.activeRouteKey]?.distanceKm || 8500;
+                renderFlightRouteAndTimeline(APP_STATE.currentRouteWaypoints, dist);
+            }
+        }
+
+        function toggleRegulatoryModal() {
+            const modal = document.getElementById('reg-modal');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        /*************************************************************************
+         * 10. POLYGONES GEOJSON MONDIAUX DE SECOURS (100% AUTONOME HORS-LIGNE)
+         *************************************************************************/
+        function getEmbeddedWorldGeoJson() {
+            return {
+                type: "FeatureCollection",
+                features: [
+                    { type: "Feature", id: "FRA", properties: { name: "France" }, geometry: { type: "Polygon", coordinates: [[[-5, 42], [8, 42], [8, 51], [-5, 51], [-5, 42]]] } },
+                    { type: "Feature", id: "DEU", properties: { name: "Germany" }, geometry: { type: "Polygon", coordinates: [[[6, 47], [15, 47], [15, 55], [6, 55], [6, 47]]] } },
+                    { type: "Feature", id: "GBR", properties: { name: "United Kingdom" }, geometry: { type: "Polygon", coordinates: [[[-8, 50], [2, 50], [2, 59], [-8, 59], [-8, 50]]] } },
+                    { type: "Feature", id: "USA", properties: { name: "United States" }, geometry: { type: "Polygon", coordinates: [[[-125, 25], [-67, 25], [-67, 49], [-125, 49], [-125, 25]]] } },
+                    { type: "Feature", id: "CAN", properties: { name: "Canada" }, geometry: { type: "Polygon", coordinates: [[[-140, 49], [-52, 49], [-52, 72], [-140, 72], [-140, 49]]] } },
+                    { type: "Feature", id: "CHN", properties: { name: "China" }, geometry: { type: "Polygon", coordinates: [[[74, 21], [123, 21], [134, 48], [74, 48], [74, 21]]] } },
+                    { type: "Feature", id: "JPN", properties: { name: "Japan" }, geometry: { type: "Polygon", coordinates: [[[129, 30], [146, 30], [146, 45], [129, 45], [129, 30]]] } },
+                    { type: "Feature", id: "IND", properties: { name: "India" }, geometry: { type: "Polygon", coordinates: [[[68, 8], [89, 8], [89, 32], [68, 32], [68, 8]]] } },
+                    { type: "Feature", id: "ARE", properties: { name: "United Arab Emirates" }, geometry: { type: "Polygon", coordinates: [[[51, 22], [56, 22], [56, 26], [51, 26], [51, 22]]] } },
+                    { type: "Feature", id: "BRA", properties: { name: "Brazil" }, geometry: { type: "Polygon", coordinates: [[[-74, -33], [-34, -33], [-34, 5], [-74, 5], [-74, -33]]] } },
+                    { type: "Feature", id: "SGP", properties: { name: "Singapore" }, geometry: { type: "Polygon", coordinates: [[[102, 0], [106, 0], [106, 4], [102, 4], [102, 0]]] } },
+                    { type: "Feature", id: "AUS", properties: { name: "Australia" }, geometry: { type: "Polygon", coordinates: [[[113, -43], [154, -43], [154, -11], [113, -11], [113, -43]]] } },
+                    { type: "Feature", id: "RUS", properties: { name: "Russia" }, geometry: { type: "Polygon", coordinates: [[[30, 50], [170, 50], [170, 75], [30, 75], [30, 50]]] } }
+                ]
+            };
+        }
+    </script>
+</body>
+</html>
